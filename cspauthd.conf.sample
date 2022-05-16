@@ -1,0 +1,349 @@
+# ===== CRUDE SINGLE PACKET AUTHORIZATION DAEMON - CSPAuthD =====
+#
+# A sample configuration file, with all possible configuration keys thoroughly explained.
+#  The following configuration is only an EXAMPLE, and should always be customized and
+#  tailored to the specific use-case of the CSPAuthD service where it's deployed.
+#
+# This configuration is read line-by-line from top to bottom. Thus, certain values MUST BE
+#  defined before others if the fields share relation. The below sample ordering provides
+#  what would be considered the most "appropriate" order of configuration parameters.
+#
+# Problems or losses resulting in a failure to specify your own configuration values for this
+#  application are not the responsibility of the application's developers or contributors.
+#
+# We (the aforementioned) SHARE NO LIABILITY in the potential misuse of this application, or
+#  any abuse thereof. Your implementation is entirely your responsibility, and your use of
+#  this application is your consent that you've read and understood this header.
+#
+#        !!!!!!!!!!!!!!!!!!!!!!!!!!
+#        !! YOU HAVE BEEN WARNED !!
+#        !!!!!!!!!!!!!!!!!!!!!!!!!!
+#
+# To fully acknowledge this, please set the below configuration value for i_agree to 'yes'.
+#
+#
+i_agree = no
+
+
+# The port on which the service UDP socket should listen for SPA packets.
+#  This value has a default of 41937, which is unassigned service space according to the IANA.
+#
+# It is recommended to change this to some other high-range, cryptic port number to evade common
+#  port scanners looking for 'noisy' CSPAuthD instances.
+#
+bind_port = 41937
+
+
+# The interface to use in binding. If this is commented out or set to 'any', the service will
+#  listen on any available interfaces for all UDP SPA traffic going to the bind_port.
+#
+bind_interface = any
+#bind_interface = eth1
+
+
+# The address to specifically bind to, which must exist on the system. If the bind_interface is
+#  defined, this address must be one of the interface's addresses. This cannot be a hostname.
+#
+# If an IPv4 address is specified, then the ipv4_only option will be set to YES by force, and
+#  (expectedly) the service will not accept IPv6 connections. The same goes for IPv6 addresses.
+#
+# If this is set to 'any', the service will accept connections on any local interface address.
+#
+bind_address = any
+#bind_address = 2001:db8::c5ba:d:ff00
+#bind_address = 192.0.2.148
+
+
+# Set this option to 'yes' to disable IPv6. This will disable both the listening socket and the
+#  outbound packets from using IPv6, or even trying to.
+#
+# It's recommended to just leave this alone if possible, since the socket that bind() uses with
+#  the IPv6 "any" address is dual-stack for v4 and v6 compatibility by default.
+#
+ipv4_only = no
+
+
+# Similarly, this option tells the service to only accept IPv6 connections. Both this and the
+#  above option CANNOT be set to YES: they are mutually exclusive.
+#
+# CSPAuthD uses an IPv6 binding by default, which also accepts IPv4 traffic by means of address
+#  mapping. Setting this or the ipv4_only options can help in being more explicit about which
+#  addresses are connecting to the socket, without dealing with changing address types/formats.
+#
+ipv6_only = no
+
+
+# The mode selects how cspauthd will respond to inbound packets on its bind_port. Options range
+#  from sending no response, to responding to any SPA data that hits the socket. Be careful with
+#  this setting, as it can widen the scope of reconnaissance against your infrastructure if used
+#  improperly.
+#
+# All modes of operation run the same "under the hood", by parsing and validating SPA packets.
+#  The difference, again, is in how and when the service responds to those validations.
+#
+#
+# Valid selections are:
+#   dead: The service won't even respond to successful, authorized SPA packets. Completely silent.
+#
+#   stealthy: The service will never issue a response to an invalid SPA packet, but will
+#     gladly respond to successful authorizations -- meaning an action was authorized by the SPA.
+#
+#   helpful: The service will never respond to invalid SPA packets, but will always respond to
+#     successful authentications, even if the user is not authorized to perform the requested
+#     action. In other words, only authentications will generate a response packet, but if the
+#     user isn't authorized for the requested action, responses will still be sent to notify them.
+#
+#   noisy: NOT RECOMMENDED. The service will respond to SPA packets, including ones that fail,
+#     but if and only if the service parses what appears to be a valid SPA packet format. This
+#     mode can be a little dumb about what it thinks are SPA packets; use with great caution.
+#
+mode = stealthy
+
+
+# Defines the level of service logging that should be done. These are all written to local syslog.
+#  Additionally, output is copied to a local terminal if the binary is run at an interactive shell.
+#
+# There are four levels of service logging. Each level of logging is cumulative:
+#   0: Quiet. Only log successful authorizations (SPA packets which result in a performed action).
+#   1: Normal logging. Captures only important events and details about incoming SPA transactions.
+#   2: Verbose logging. Loudly track all listening port activity.
+#   3: Debug logging. Display/Log everything the service is doing at all times.
+#
+log_level = 1
+
+
+# The validity_window is a sliding window of seconds that gets BOTH ADDED and SUBTRACTED to the
+#  server time the instant a SPA packet is received. If the packet timestamp falls within the range
+#  from low to high, then the timestamp is considered "valid".
+#
+# It's thus critical to make sure there isn't much clock drift between your SPA client and server.
+#  (Amusingly, purposeful time-skew on a server could act as additional "security" for the bold.)
+#
+# The validity_window can never be lower than 10 seconds, nor higher than 24 hours (86400 seconds).
+#  It is important to make this value a factor of 10, since the thread which monitors replay packet
+#  hashes will check its linked list for stale entries once every 10 seconds.
+#
+# This is also a window of seconds in which replays of a packet can be submitted, if and only if
+#  the prevent_replay option below is NOT set to 'yes'. It's noteworthy here that the crypto
+#  signature of a SPA guarantees that a "replay" will only ever be able to resubmit a packet with
+#  the EXACT SAME DATA (user, action, time, and options) as the original packet.
+#
+validity_window = 60
+
+
+# When enabled, this option stores the hashes of SPA packets which have performed an action, and
+#  checks new inbound authorizations for occurrences of the same message hash. Any packets matching
+#  an already-used hash will be rejected/denied immediately.
+#
+# The list of hashes are also indexed with timestamps. Whenever a timestamp older than the above
+#  validity_window option (relative to current server time) is discovered in memory, it is marked as
+#  stale and its space freed, since the original packet timestamp is now outside the validity window.
+#
+# Since the service only tracks successful and authorized SPA packet hashes, a malicious actor is
+#  not able to abuse this mechanism and potentially DoS a system by running up resource usage.
+#
+# NOTE: prevent_replay uses in-memory heap data. If the service is restarted through a stop-start
+#        mechanism--rather than a simple SIGHUP signal--the tracker buffer is cleared.
+#
+# !!!!!!!!!!
+# THIS SETTING IS HIGHLY RECOMMENDED TO LEAVE ON, ESPECIALLY IF YOUR ACTIONS USE [[SRCIP]] TOKENS.
+# !!!!!!!!!!
+#
+prevent_replay = yes
+
+
+# Definitions of all permitted users. These are comma-separated values and the values do not
+#  necessarily need to reflect (and will not associate with) actual system users. Each user defined
+#  here is required to have a corresponding public key (see below), or their entries in this list
+#  and elsewhere will be disregarded.
+#
+# The service limits the amount of defineable users to 128. These users MUST be defined BEFORE the
+#  section that defines pubkeys and autls. Additionally, multiple 'users' lines can be defined to
+#  continue the users definition on another line.
+#
+# These names are alphanumeric ONLY. That's a regex match per username of: ^[a-zA-Z0-9]+$
+#
+users = zack,johnny
+users = alice
+
+
+# CSPAuthD relies on PKI to verify that the packets being submitted are indeed authorized users
+#  attempting to perform an action. The client signs the packet with their private key and the
+#  service verifies the SHA256 hash signature with the user's corresponding public key.
+#
+# Public keys for users should be defined as absolute paths, and MUST be readable by the service
+#  user. If for any reason a public key cannot be read or is invalid, the service will HALT by
+#  default. Set the option skip_invalid_pubkeys to 'yes' to continue processing other users even
+#  when there is a failure for processing one or more public keys in the list.
+#
+# When skip_invalid_pubkeys is set to 'yes':
+# If a user is referenced here that is NOT defined in the users value, the line is disregarded and
+#  the requested public key is not loaded. Similarly, a failure to find a public key associated with
+#  one of the above users will completely invalidate that user from being able to get any SPAs through
+#  the service.
+#
+# Public keys should always be PEM-formatted certificates--preferably x509--with a maximum signature
+#  size of 2,048 BYTES of data. This would, for example, allow RSA public key moduli up to 16,384 bits.
+#
+skip_invalid_pubkeys = yes
+
+pubkey:zack = /tmp/ecpub.pem
+pubkey:johnny = /opt/cspauthd/pki/johnny-20220101.pub
+pubkey:alice = /this/user/doesnt/exist/anywhere.pub
+
+
+# A catch-all action handler can be defined, which can receive the same tokens as the 'action' section
+#  (see below), in whichever way you prefer to specify them. This is defined before the 'action' section
+#  simply because a generic_action definition will halt loading of any 'action' items.
+#
+# WARNING: If this option is specified, none of the action or autl definitions will be honored.
+#
+# When it comes to authorizations, ANY defined user is authorized to send requests to the generic_action
+#  handler. In such cases, it is the responsibility of your custom handler to filter whether the user
+#  should be able to perform the action-option combination.
+#
+#generic_action = /usr/bin/python3 /opt/handleSPA.py "[[ACTION]]" "[[OPTION]]" "[[USER]]" "[[SRCIP]]"
+
+
+# Authorization lists specify which users are able to execute which action-option combinations, also
+#  called 'functions', through a custom rules syntax.
+#
+# The maximum defineable AUTL policies per user is limited to 1024 entries.
+#  The maximum amount of individual ('+'-separated) options values per AUTL is limited to 29,
+#  in order to keep the packed autl structure at a nice, rounded size.
+#  In the case of a range like '1-400', it's counted as a single entry, not 400 of them.
+#
+# NOTE that if the generic_action option is enabled, then autl policies are invalidated entirely.
+#
+# Included below are one simple and one complex sample authorization list each.
+# The format of the authorization list is:
+#  autl:USERNAME = ACTION_ID,OPTION_IDS|ACTION_ID2,OPTION_IDS2| ... |ACTION_IDN,OPTION_IDSN
+#
+# , where:
+# ... USERNAME exists in the 'users' list above. Failing this check will HALT the application.
+# ... the OPTION_IDS are defined as a combination of single IDs and ranges, separated by a '+'.
+# ... the ACTION_ID and the OPTION_IDS are separated by a comma.
+# ... the different ACTION_ID fields are separated by a pipe.
+# ... both OPTION_IDS and ACTION_ID fields contain values that are within the range of 1-65534.
+#
+#
+
+# Allow user 'zack' access to action #22 with option values: between 1 and 400, at 5445, and at 999.
+#  Also permit action 8445 with only option 80, and action 777 with any option 1024 <= x <= 65534.
+#  Finally, allow action 1 with any option.
+autl:zack = 22,1-400+5445+999|8445,80
+autl:zack = 777,1024-65534|1,*
+
+# Allow user 'johnny' access to any action and option. Basically free reign over all defined functions.
+autl:johnny = *,*
+
+# Allow user 'alice' access to any action, but only with options 21 and 4778. Also give her function 27:47.
+#  Note that by the syntax, Alice will also be able to use function 27:21 and 27:4778 because of the first
+#  function authorization.
+autl:alice = *,21+4778|27,47
+
+
+# Definitions of actions that the service can call on the system to perform when it receives valid SPAs,
+#  for which the requesting user has authorization (according to the autl lists).
+#
+# Most often, an action is just a command run from the service user's shell, or likewise a call to some
+#  kind of script handling mechanism. This is why the service is considered "crude", as it leaves the rest
+#  of the program's actual implementation up to implementer and it isn't exceedingly restrictive.
+#
+# The MAXIMUM defineable actions count is limited to 1024. If more is needed, a generic_action handler may
+#  be a more comprehensive solution to more complex, evolved needs.
+# Action command-line strings are limited to 256 characters.
+#
+# Each action is indexed by an ID from 1 to 65534 --> action:ID
+#  Duplicate action IDs will invalidate a configuration and prevent CSPAuthD from starting.
+#
+# Every action definition can include any dynamic token values where desired. These are specified in the
+#  SPA packets, some of which can be easily set using the CSPAuth client application.
+#
+# Expandable tokens include:
+#
+#   [[OPTION]] = The TEXT value/string of the provided action_option code in the packet, in decimal.
+#      This can either be used as the integer value itself (as TEXT), or as an index to a particular action
+#      within the target action's processes. Like other tokens, what you do with it is really up to you.
+#   [[ACTION]] = The TEXT value/string of the requested action ID; self-referential.
+#   [[USER]]   = The TEXT value/string of the user being authorized to perform the action.
+#   [[SRCIP]]  = The TEXT value/string of the source IP address which sent the authorized SPA.
+#   [[IPFAM]]  = The TEXT value/string of the source IP address family, either '4' or '6'.
+#   [[SRCPT]]  = The TEXT value/string of the source port which sent the authorized SPA.
+#   [[TIME]]   = The TEXT value/string of the timestamp within the authorized SPA packet.
+#   [[UNSAFE_DATA]] = The TEXT value/string of the (intended-to-be) randomized data portion of a SPA packet.
+#     ^ Use this field if you KNOW what you're doing. Though its length is limited, it can lead directly
+#        to command-line injection from malicious packets that pass authorization.
+#     !! Any sanitizations done to this string are explained below with the 'sanitize_packet_data' option.
+#
+#
+
+# Action #1: A simple hello world.
+action:1 = /usr/bin/logger "Hello, world"
+
+# Action #22: SSH command to a remote server and execute a predefined command from the option field.
+#  This is a sort of SPA-by-proxy which is really cheesy but could have its applications.
+action:22 = ssh -p 22222 -i /opt/ssh/mykey root@my.example.com "/bin/bash /opt/doactions.sh [[OPTION]]"
+
+# Action #32: Run a predefined Bash script and pass it the numeric (decimal) value of the SPA packet option.
+action:32 = /bin/bash /root/runscript.sh [[OPTION]]
+
+# Action #8445 sets the source IP (whoever sent the valid SPA packet) to be allowed to access a TCP service.
+action:8445 = [[ "[[IPFAM]]" == "6" ]] && FAM=6; sudo ip${FAM}tables -I INPUT --src [[SRCIP]] -p tcp --dport [[OPTION]] -j ACCEPT
+# Action #8446 will do the same as #8445 except it will work for permitting UDP-proto packets instead.
+action:8446 = [[ "[[IPFAM]]" == "6" ]] && FAM=6; sudo ip${FAM}tables -I INPUT --src [[SRCIP]] -p udp --dport [[OPTION]] -j ACCEPT
+
+# Action #777 will call a script to create a temporary rich rule in firewalld, then close it after a time.
+#  As an example, some code for the script referenced below (knock-knock) is included in the cspauth source.
+action:777 = sudo /opt/knock-knock.sh "[[SRCIP]]" "[[OPTION]]" "[[UNSAFE_DATA]]" "tcp" "blahblah"
+
+
+# Whether for debug or auditing purposes, it can be beneficial to track the exit code of a function call.
+#  Normally, the service will only output WARNING-level error logs on non-zero shell function calls.
+#
+# Set to 'yes' to log the exit code of ALL function calls. When enabled, this will output the string to
+#  syslog regardless of the set log_level of the application.
+#
+log_exit_codes = yes
+
+
+# When the server socket is bound to the IPv6 wildcard address (::) for incoming connections,
+#  which is the application default for operating in dual-stack mode, all IPv4 client connections
+#  will have their [[SRCIP]] token in the action string (see above) render the source address using
+#  IPv4-to-IPv6 address mapping. This is enabled by default.
+#
+# Set this option to 'no' to force IPv4 client connections to use an actual IPv4-formatted address
+#  in dot-notation (xxx.xxx.xxx.xxx) regardless of the protocol being used on the bound socket.
+#
+# Example with source IPv4 address 192.0.2.245:
+#   - Set to 'yes': [[SRCIP]] expands to '::ffff:192.0.2.245'
+#   - Set to 'no' : [[SRCIP]] expands to '192.0.2.245'
+#
+# This setting will be ignored if bind_address is set, or if ipv4_only/ipv6_only is set to yes.
+#
+map_ipv4_addresses = yes
+
+
+# The sanitize_packet_data field controls how select characters should be mapped or translated in
+#  the expanded action string. This is a char-to-char relationship, meaning a single character can
+#  only be mapped to another single character. This is both useful and recommended for ensuring no
+#  command-line injection will take place when asking cspauthd to expand the [[UNSAFE_DATA]] token,
+#  as referenced above.
+#
+# Up to 128 different char-to-char mappings can be defined with this option, and the application
+#  will be certain to do the mapping on all of them.
+#
+# As an example, the below translations will neuter the '$', ';', '!', and '`' characters by
+#  translating them both to a simple '_' underscore character before actually running the action
+#  string.
+#
+sanitize_packet_data:$ = _
+sanitize_packet_data:; = _
+sanitize_packet_data:! = _
+sanitize_packet_data:` = _
+# The replacements are not 'chained' -- therefore, replacing the underscore character here does not affect
+#  the replacements above, only underscores that appear in the original packet string.
+sanitize_packet_data:_ = X
+
+
+
