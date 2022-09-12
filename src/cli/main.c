@@ -78,19 +78,22 @@ void print_usage_info() {
 
 
 
-uint16_t get_valid_uint16( char* str, char* type );
+// Process management (signals registration/handling).
 void register_signals();
 void handle_signal( int signal );
-
+// Used to validate a string as a legitimate, in-range uint16_t value and return it accordingly.
+uint16_t get_valid_uint16( char* str, char* type );
 // Signs a packet and stores its signature on the pointed packet.
 int sign_packet( BYTE* key_file, spa_packet_t* p_packet, int is_debug );
 
 # ifdef DEBUG
+// Used to print raw information about a packet or other data in memory.
 void print_hex( BYTE* data, size_t len );
 # endif
 
 
 
+// Main function for CLI.
 int main( int argc, char** argv ) {
     // Initial registrations and client setup.
     register_signals();
@@ -174,7 +177,7 @@ int main( int argc, char** argv ) {
                 break;
 
             case 'w':   //wait (for SPA server response) for x seconds
-                if ( wait_time != 0 )
+                if ( 0 != wait_time )
                     errx( 1, "The wait timeout can only be defined once.\n" );
 
                 wait_time = get_valid_uint16( optarg, "Wait timeout" );
@@ -186,21 +189,21 @@ int main( int argc, char** argv ) {
                 break;
 
             case 'k':   //keyfile
-                if ( strnlen( (const char*)p_key_file, PATH_MAX ) != 0 )
-                    errx( 1, "Key-file can only be defined once.\n" );
+                if (  0 != strnlen( (const char*)p_key_file, PATH_MAX )  )
+                    errx( 1, "The key-file can only be defined once.\n" );
 
                 memcpy( p_key_file, optarg, strnlen(optarg,PATH_MAX) );
                 p_key_file[PATH_MAX-1] = '\0';   //force null-term
                 break;
 
             case 'f':   //function
-                if ( action != 0 )
+                if ( 0 != action )
                     errx( 1, "The function to call cannot be defined twice.\n" );
 
                 const char delim[] = ":";
 
-                char* func = strndup( optarg, 13 );   //never needs to be more than 13 chars
-                if ( func == NULL )
+                char* func = strndup( optarg, 13 );   //never needs to be more than 13 chars 'XXXXX:YYYYY'
+                if ( NULL == func )
                     errx( 1, "Function option requires a valid argument.\n" );
 
                 // get action
@@ -212,70 +215,81 @@ int main( int argc, char** argv ) {
                 // If an option is defined, set it if it's valid.
                 option = (y != NULL) ? get_valid_uint16( y, "Function option" ) : 1;
 
+                free( func );
                 break;
 
             case 'u':   //user
-                if ( strnlen( (const char*)p_user, SPA_PACKET_USERNAME_SIZE ) != 0 )
-                    errx( 1, "Username can only be defined once.\n" );
+                if (  0 != strnlen( (const char*)p_user, SPA_PACKET_USERNAME_SIZE )  )
+                    errx( 1, "The packet's username can only be defined once.\n" );
 
                 memcpy( p_user, optarg, strnlen(optarg,SPA_PACKET_USERNAME_SIZE) );
 
-                if ( strnlen( (const char*)optarg, SPA_PACKET_USERNAME_SIZE ) > SPA_PACKET_USERNAME_SIZE-1 )
-                    fprintf( stderr, "WARNING: Given username was longer than the "
-                        "%d character limit. Value truncated.\n", SPA_PACKET_USERNAME_SIZE-1 );
+                if (  strlen( (const char*)optarg ) > (SPA_PACKET_USERNAME_SIZE-1)  ) {
+                    p_user[SPA_PACKET_USERNAME_SIZE-1] = '\0';   //force null-term
 
-                p_user[SPA_PACKET_USERNAME_SIZE-1] = '\0';   //force null-term
+                    fprintf( stderr, "WARNING: Given username was longer than the "
+                        "%d character limit.\n\tThe value was truncated to '%s'.\n",
+                        (SPA_PACKET_USERNAME_SIZE-1), p_user );
+                }
                 break;
 
             case 't':   //target
-                if ( strnlen( (const char*)p_tgtnode, MAX_TARGET_STRLEN ) != 0 )
-                    errx( 1, "Target address can only be defined once.\n" );
+                if (  0 != strnlen( (const char*)p_tgtnode, MAX_TARGET_STRLEN )  )
+                    errx( 1, "The target address can only be defined once.\n" );
 
                 memcpy( p_tgtnode, optarg, strnlen(optarg,MAX_TARGET_STRLEN) );
-
                 p_tgtnode[MAX_TARGET_STRLEN-1] = '\0';   //force null-term
+
                 break;
 
             case 'p':   //port
-                if ( tgtport != 0 )
+                if ( 0 != tgtport )
                     errx( 1, "The target port can only be defined once.\n" );
 
                 tgtport = get_valid_uint16( optarg, "Target port" );
+
                 break;
 
             case 'd':   //data
-                if ( strnlen( (const char*)p_data, SPA_PACKET_DATA_SIZE ) != 0 )
-                    errx( 1, "Data can only be defined once.\n" );
+                if (  0 != strnlen( (const char*)p_data, SPA_PACKET_DATA_SIZE )  )
+                    errx( 1, "The packet's data can only be defined once.\n" );
 
                 memcpy( p_data, optarg, strnlen(optarg,SPA_PACKET_DATA_SIZE) );
 
-                if ( strnlen( (const char*)optarg, SPA_PACKET_DATA_SIZE ) > SPA_PACKET_DATA_SIZE-1 )
+                if (  strlen( (const char*)optarg ) > (SPA_PACKET_DATA_SIZE-1)  )
                     fprintf( stderr, "WARNING: Given data field was longer than the "
                         "%d character limit. Value truncated.\n", SPA_PACKET_DATA_SIZE-1 );
 
                 p_data[SPA_PACKET_DATA_SIZE-1] = '\0';   //force null-term
+
                 break;
         }
     }
 
 
-    // Check that all required variables are initialized.
-    if ( action == 0 )
+    // Check that all required variables are initialized and within the right parameters.
+    if ( 0 == action )
         errx( 1, "The function action must be set to a non-zero option; see the 'f' option.\n" );
-    if ( strnlen( (const char*)p_key_file, PATH_MAX ) <= 0 )
+
+    else if (  0 >= strnlen( (const char*)p_key_file, PATH_MAX )  )
         errx( 1, "A valid key-file must be defined with the 'k' option.\n" );
-    if ( strnlen( (const char*)p_user, SPA_PACKET_USERNAME_SIZE ) <= 0 )
+
+    else if (  0 >= strnlen( (const char*)p_user, SPA_PACKET_USERNAME_SIZE )  )
         errx( 1, "A username must be defined with the 'u' option.\n" );
-    if ( strnlen( (const char*)p_tgtnode, MAX_TARGET_STRLEN ) <= 0 )
+
+    else if (  0 >= strnlen( (const char*)p_tgtnode, MAX_TARGET_STRLEN )  )
         errx( 1, "A target IP or hostname must be defined with the 't' option.\n" );
+
+    // If both flags are used, the user just doesn't care about the addr type.
+    //   This is the default behavior; no sense in throwing another error, just clear the flags
     if ( is_ipv4 == ON && is_ipv6 == ON ) {
-        // if both flags are provided, the user just doesn't care about the addr type.
-        //   this is the default behavior anyway; no sense in throwing another error, just clear flags
         is_ipv4 = OFF;
         is_ipv6 = OFF;
     }
+
+    // Make sure the specified key file is open-able.
     FILE* fp = NULL;
-    if ( (fp = fopen((const char*)p_key_file,"r")) == NULL )
+    if (  NULL == (fp = fopen((const char*)p_key_file, "r"))  )
         errx( 1, "Failed to read key file '%s'.\n", p_key_file );
     fclose( fp );
 
@@ -288,8 +302,10 @@ int main( int argc, char** argv ) {
         printf( "* Port unspecified; using default cspauthd port of '%d'.\n\n", SPA_DEFAULT_BIND_PORT );
         tgtport = SPA_DEFAULT_BIND_PORT;   //assumes default cspauthd port
     }
-    if ( strnlen( (const char*)p_data, SPA_PACKET_DATA_SIZE ) <= 0 ) {
-        __debug( printf( "+ Unspecified data string; generating random data.\n" ); )
+
+    // If no data was provided for the packet data field, randomize the data.
+    if (  0 >= strnlen( (const char*)p_data, SPA_PACKET_DATA_SIZE )  ) {
+        __debug(  printf( "+ Unspecified data string; generating random data.\n" );  )
         // if the data field is not set, randomize the data
         srandom( (unsigned int)time(NULL) );
         for ( BYTE* p = p_data; p < (p_data+SPA_PACKET_DATA_SIZE); p++ )
@@ -324,8 +340,10 @@ int main( int argc, char** argv ) {
     port_c[5] = '\0';
 
     __debug( printf( "Getting IPs from input string '%s'.\n", p_tgtnode ); )
-    int __addrinfo_rc = getaddrinfo( (const char*)p_tgtnode, &port_c[0], p_hints, &p_res );
-    if ( __addrinfo_rc != 0 ) {
+    int __addrinfo_rc =
+        getaddrinfo( (const char*)p_tgtnode, &port_c[0], p_hints, &p_res );
+
+    if ( 0 != __addrinfo_rc ) {
         fprintf( stderr, "getaddrinfo: %s\n", gai_strerror(__addrinfo_rc) );
         exit( 1 );
     }
@@ -357,6 +375,7 @@ int main( int argc, char** argv ) {
 
         char ipstr[INET6_ADDRSTRLEN];
         memset( ipstr, 0, INET6_ADDRSTRLEN );
+
         if (  NULL != inet_ntop( p_res_i->ai_family, p_foundaddr, ipstr, INET6_ADDRSTRLEN )  ) {
             __debug( printf( "+++++ Got address '%s'\n", ipstr ); )
             if ( -1 == addrfam && NULL != p_addr_tmp ) {
@@ -391,7 +410,7 @@ int main( int argc, char** argv ) {
     __debug( printf( "+++++ Socket ready.\n\n" ); )
 
 
-    // Construct the packet.
+    // Construct the SPA packet.
     spa_packet_t* p_packet = (spa_packet_t*)calloc( 1, sizeof(spa_packet_t) );
 
     time_t now;
@@ -400,17 +419,23 @@ int main( int argc, char** argv ) {
 
     __debug( printf( "+++ Populating packet fields.\n" ); )
     memcpy( &p_packet->packet_data[0], p_data, SPA_PACKET_DATA_SIZE );
+
     __debug( printf( "+++++ Packet username: '%s'\n", p_user ); )
     memcpy( &p_packet->username, p_user, SPA_PACKET_USERNAME_SIZE );
+
     __debug( printf( "+++++ Timestamp: %lu\n", timestamp ); )
     p_packet->client_timestamp = timestamp;
+
     __debug( printf( "+++++ Function action: %d\n", action ); )
     p_packet->request_action = action;
+
     __debug( printf( "+++++ Function option: %d\n", option ); )
     p_packet->request_option = option;
+
     __debug( printf( "+++++ Generating packet hash.\n" ); )
     if (  0 >= hash_packet( &p_packet->packet_hash[0], p_packet )  )
         errx( 1, "Failed to hash the SPA packet.\n" );
+
     __debug( printf( "+++++ Generating packet signature.\n" ); )
     if (  EXIT_SUCCESS != sign_packet( p_key_file, p_packet, is_debug )  )
         errx( 1," Failed to generate packet crypto signature.\n" );
@@ -420,7 +445,8 @@ int main( int argc, char** argv ) {
     size_t dispatch_len = SPA_PACKET_MIN_SIZE + p_packet->signature_length;
 
     if (  dispatch_len < SPA_PACKET_MIN_SIZE || dispatch_len > SPA_PACKET_MAX_SIZE  )
-        errx( 1, "Illegal packet length. x != %lu <= x <= %lu\n", SPA_PACKET_MIN_SIZE, SPA_PACKET_MAX_SIZE );
+        errx( 1, "Illegal packet length. x != %lu <= x <= %lu\n",
+            SPA_PACKET_MIN_SIZE, SPA_PACKET_MAX_SIZE );
 
 # ifdef DEBUG
     __debug(
@@ -457,8 +483,9 @@ int main( int argc, char** argv ) {
         struct timeval* p_tv = (struct timeval*)calloc( 1, sizeof(struct timeval) );
 
         p_tv->tv_sec = wait_time;
-        if ( (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, p_tv, sizeof(struct timeval) )) < 0 )
+        if (  0 > (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, p_tv, sizeof(struct timeval) ))  )
             err( 1, "setsockopt: SO_RCVTIMEO" );
+
         free( p_tv );
 
         size_t recvbytes;
@@ -466,14 +493,17 @@ int main( int argc, char** argv ) {
         memset( &recv_buffer[0], 0, PACKET_BUFFER_SIZE );
 
         printf( "Awaiting UDP response from remote server for %d seconds...\n", wait_time );
-        int remoteaddrlen = ( (addrfam == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) );
-        if ( (recvbytes = recvfrom( sockfd, recv_buffer, PACKET_BUFFER_SIZE,
-                MSG_WAITALL, (struct sockaddr*)&p_addr, (socklen_t*)&remoteaddrlen )) < 0 )
+        int remoteaddrlen = ( (AF_INET == addrfam)
+            ? sizeof(struct sockaddr_in)
+            : sizeof(struct sockaddr_in6)
+        );
+
+        if (  0 > (recvbytes = recvfrom( sockfd, recv_buffer, PACKET_BUFFER_SIZE,
+                MSG_WAITALL, (struct sockaddr*)&p_addr, (socklen_t*)&remoteaddrlen ))  )
             err( 1, "recvfrom" );
         __debug( printf( "+++++ RECVBYTES: %lu\n", recvbytes ); )
 
         // Usually ridiculous numbers from the socket indicate a signal was trapped.
-        //   In such events, the main thread should just quietly continue to run.
         if ( recvbytes <= 0 || recvbytes > UINT32_MAX-1 ) {
             __debug( printf( "~~~ Received 0 or > uint32_t length packet; invalid response.\n" ); )
             printf( " === Listening socket timed out.\n\n" );
@@ -483,7 +513,7 @@ int main( int argc, char** argv ) {
         __debug( printf( "\n+++ Received %lu bytes of UDP response socket data.\n", recvbytes ); )
 
         if ( recvbytes != sizeof(spa_response_packet_t) )
-            errx( 1, " === Received a response packet that was not the expected size. Exiting now.\n\n" );
+            errx( 1, " === Received a UDP response packet that was not the expected size.\n\n" );
 
 
         // "Cast" and parse the response.
@@ -523,6 +553,25 @@ int main( int argc, char** argv ) {
 
 
 
+// Process management (handle signals).
+void register_signals() {
+    struct sigaction sa;
+    memset( &sa, 0, sizeof(struct sigaction) );
+    sa.sa_handler = handle_signal;
+    sigaction( SIGINT,  &sa, NULL );
+    sigaction( SIGTERM, &sa, NULL );
+    sigaction( SIGKILL, &sa, NULL );
+    sigaction( SIGHUP,  &sa, NULL );
+    return;
+}
+void handle_signal( int signal ) {
+    fprintf( stderr, "Received signal '%d'. Goodbye.\n", signal );
+    exit( 0 );
+}
+
+
+
+// Used to validate a string as a legitimate, in-range uint16_t value and return it accordingly.
 uint16_t get_valid_uint16( char* str, char* type ) {
     if ( str == NULL || strnlen(str,6) > 5 )
         errx( 1, "%s is not valid.\n", type );
@@ -542,40 +591,9 @@ uint16_t get_valid_uint16( char* str, char* type ) {
 
 
 
-void register_signals() {
-    struct sigaction sa;
-    memset( &sa, 0, sizeof(struct sigaction) );
-    sa.sa_handler = handle_signal;
-    sigaction( SIGINT,  &sa, NULL );
-    sigaction( SIGTERM, &sa, NULL );
-    sigaction( SIGKILL, &sa, NULL );
-    sigaction( SIGHUP,  &sa, NULL );
-    return;
-}
-
-void handle_signal( int signal ) {
-    fprintf( stderr, "Received signal '%d'. Goodbye.\n", signal );
-    exit( 0 );
-}
-
-
-
-# ifdef DEBUG
-void print_hex( BYTE* data, size_t len ) {
-    for ( size_t i = 0; i < len; i++ ) {
-        if ( !(i % 8) )   fprintf(stderr, "  ");
-        if ( !(i % 16) )  fprintf(stderr, "\n");
-        fprintf(stderr, "%02x ", data[i]);
-    }
-    fprintf(stderr, "\n\n");
-}
-# endif
-
-
-
 // Verify the actual crypto signature attached to the packet.
 int sign_packet( BYTE* key_file, spa_packet_t* p_packet, int is_debug ) {
-    __debug( printf( "crypto: Checking packet's SHA256 signature with the user's pubkey.\n" ); )
+    __debug(  printf( "crypto: Checking packet's SHA256 signature with the user's pubkey.\n" );  )
 
     int rc = -1;
     FILE* fp = NULL;
@@ -587,14 +605,14 @@ int sign_packet( BYTE* key_file, spa_packet_t* p_packet, int is_debug ) {
     size_t slen = 0;
 
 
-    __debug( printf( "crypto: Attempting to load PEM private key file '%s'.\n", key_file ); )
-    if ( (fp = fopen((const char*)key_file,"r")) == NULL ) {
+    __debug(  printf( "crypto: Attempting to load PEM private key file '%s'.\n", key_file );  )
+    if (  NULL == (fp = fopen((const char*)key_file,"r"))  ) {
         fprintf( stderr, "crypto: Failed to load private key file.\n" );
         goto __err;
     }
 
-    __debug( printf( "crypto: Reading PEM from input file pointer.\n" ); )
-    if ( (pkey = PEM_read_PrivateKey(fp,NULL,NULL,NULL)) == NULL ) {
+    __debug(  printf( "crypto: Reading PEM from input file pointer.\n" );  )
+    if (  NULL == (pkey = PEM_read_PrivateKey(fp,NULL,NULL,NULL))  ) {
         fprintf( stderr, "crypto: Failed to read private key from file.\n" );
         goto __err;
     }
@@ -602,55 +620,83 @@ int sign_packet( BYTE* key_file, spa_packet_t* p_packet, int is_debug ) {
     fclose( fp );
 
 
-    __debug( printf( "crypto: Creating digest context.\n" ); )
-    if ( !(mdctx = EVP_MD_CTX_create()) )  goto __err;
+    __debug(  printf( "crypto: Creating digest context.\n" );  )
+    if (  !(mdctx = EVP_MD_CTX_create())  )
+        goto __err;
 
-    __debug( printf( "crypto: Initializing digest context.\n" ); )
-    if ( EVP_DigestSignInit( mdctx, NULL, EVP_sha256(), NULL, pkey ) != 1 )  goto __err;
+    __debug(  printf( "crypto: Initializing digest context.\n" );  )
+    if (  1 != EVP_DigestSignInit( mdctx, NULL, EVP_sha256(), NULL, pkey )  )
+        goto __err;
 
-    __debug( printf( "crypto: Updating digest context.\n" ); )
-    if ( EVP_DigestSignUpdate( mdctx, &p_packet->packet_hash[0], SPA_PACKET_HASH_SIZE ) != 1 )  goto __err;
+    __debug(  printf( "crypto: Updating digest context.\n" );  )
+    if (  1 != EVP_DigestSignUpdate( mdctx, &p_packet->packet_hash[0], SPA_PACKET_HASH_SIZE )  )
+        goto __err;
 
-    __debug( printf( "crypto: Getting final signature buffer length.\n" ); )
-    if ( EVP_DigestSignFinal( mdctx, NULL, &slen ) != 1 )  goto __err;
+    __debug(  printf( "crypto: Getting final signature buffer length.\n" );  )
+    if (  1 != EVP_DigestSignFinal( mdctx, NULL, &slen )  )
+        goto __err;
 
-    __debug( printf( "crypto: Allocating _predicted_ space for signature copy.\n" ); )
-    if ( !(sig = (BYTE*)OPENSSL_malloc( sizeof(BYTE)*slen )) )  goto __err;
+    __debug(  printf( "crypto: Allocating _predicted_ space for signature copy.\n" );  )
+    if (  !(sig = (BYTE*)OPENSSL_malloc( sizeof(BYTE)*slen ))  )
+        goto __err;
 
-    __debug( printf( "crypto: Generating signature...\n" ); )
-    if ( EVP_DigestSignFinal( mdctx, sig, &slen ) != 1 )  goto __err;
+    __debug(  printf( "crypto: Generating signature...\n" ); )
+    if (  1 != EVP_DigestSignFinal( mdctx, sig, &slen )  )
+        goto __err;
+
     rc = 1;
 
     // NOTE: slen gets updated in the final signing above. The initial malloc is to get the POTENTIAL signature size.
     if ( slen > SPA_PACKET_MAX_SIGNATURE_SIZE ) {
-        fprintf( stderr, "crypto: The final signature exceeds maximum size of %d bytes.\n", SPA_PACKET_MAX_SIGNATURE_SIZE );
+        fprintf( stderr, "crypto: The final signature exceeds maximum size of %d bytes.\n",
+            SPA_PACKET_MAX_SIGNATURE_SIZE );
         goto __err;
     }
 
-    __debug( printf( "crypto: Got valid packet signature with size of %lu bytes.\n", slen ); )
+    __debug(  printf( "crypto: Got valid packet signature with size of %lu bytes.\n", slen );  )
     p_packet->signature_length = (slen & 0xFFFFFFFF);
 
-    __debug( printf( "crypto: Copying generated signature to packet buffer.\n" ); )
-    memcpy( &p_packet->packet_signature[0], sig, sizeof(BYTE)*slen );
+    __debug(  printf( "crypto: Copying generated signature to packet buffer.\n" );  )
+    memcpy(  &(p_packet->packet_signature[0]), sig, (sizeof(BYTE)*slen)  );
 
 
+    // This label is always reached, but only returns failure if the return code (rc) is not 1.
     __err:
-    if ( sig != NULL )  OPENSSL_free( sig );
-    if ( mdctx )  EVP_MD_CTX_destroy( mdctx );
-    if ( pkey )  EVP_PKEY_free( pkey );
+        if ( NULL != sig )
+            OPENSSL_free( sig );
 
-    if ( rc != 1 ) {
-        __debug( printf( "~~~~~ Signature verification failed. Attempting to get why...\n" ); )
+        if ( mdctx )
+            EVP_MD_CTX_destroy( mdctx );
 
-        char* openssl_err = (char*)calloc( 1, 128 );
+        if ( pkey )
+            EVP_PKEY_free( pkey );
 
-        ERR_error_string_n( ERR_get_error(), openssl_err, 128 );
-        __debug( printf( "~~~~~  ---> OpenSSL error: %s\n", openssl_err ); )
+        if ( 1 != rc ) {
+            __debug(  printf( "~~~~~ Signature verification failed. Attempting to get why...\n" );  )
 
-        free( openssl_err );
-        return EXIT_FAILURE;
-    }
+            char* openssl_err = (char*)calloc( 1, 128 );
 
-    __debug( printf( "crypto: Packet signature is OK.\n" ); )
-    return EXIT_SUCCESS;
+            ERR_error_string_n( ERR_get_error(), openssl_err, 128 );
+            __debug(  printf( "~~~~~  ---> OpenSSL error: %s\n", openssl_err );  )
+
+            free( openssl_err );
+            return EXIT_FAILURE;
+        }
+
+        __debug(  printf( "crypto: Packet signature is OK.\n" );  )
+        return EXIT_SUCCESS;
 }
+
+
+
+# ifdef DEBUG
+// Used to print raw information about a packet or other data in memory.
+void print_hex( BYTE* data, size_t len ) {
+    for ( size_t i = 0; i < len; i++ ) {
+        if ( !(i % 8) )   fprintf( stderr, "  " );
+        if ( !(i % 16) )  fprintf( stderr, "\n" );
+        fprintf( stderr, "%02x ", data[i] );
+    }
+    fprintf( stderr, "\n\n" );
+}
+# endif
