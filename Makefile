@@ -32,11 +32,23 @@ release: clean
 release: $(SVRBIN) $(CLIBIN)
 
 
+$(OBJ):
+	mkdir $(OBJ)
+
+$(SVROBJ): $(OBJ)
+	mkdir $(SVROBJ)
+
+$(CLIOBJ): $(OBJ)
+	mkdir $(CLIOBJ)
+
+$(BINDIR):
+	mkdir $(BINDIR)
+
 $(OBJ)/%.o: $(SRC)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 
-$(SVRBIN): $(COMMONOBJS) $(SVROBJS)
+$(SVRBIN): $(BINDIR) $(SVROBJ) $(COMMONOBJS) $(SVROBJS)
 	-rm $(SVRBIN)
 	$(CC) $(CFLAGS) $(COMMONOBJS) $(SVROBJS) -o $@
 
@@ -44,7 +56,7 @@ $(SVROBJ)/%.o: $(SVRSRC)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 
-$(CLIBIN): $(COMMONOBJS) $(CLIOBJS)
+$(CLIBIN): $(BINDIR) $(CLIOBJ) $(COMMONOBJS) $(CLIOBJS)
 	-rm $(CLIBIN)
 	$(CC) $(CFLAGS) $(COMMONOBJS) $(CLIOBJS) -o $@
 

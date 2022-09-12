@@ -46,34 +46,34 @@
 
 
 void __print_usage_info() {
-	printf(
-		"Usage: cspauth [-?hx46] {-k key-file} {-f function} {-u username} {-t target}\n"
-		"                   [-w wait-time] [-p port] [-d data]\n"
-		"\n"
-		"Sends a Single Packet Authorization request to the target host for the requested\n"
-		"  function, with the specified credentials. Responses can be awaited, or the\n"
-		"  client can be set to 'fire-and-forget' the request.\n"
-		"\n"
-		"Options:\n"
-		"    -h, --help      Display this help.\n"
-		"    -x, --debug     Display client debugging information.\n"
-		"    -4/-6           Force an IPv4 or IPv6 connection only.\n"
-		"    -k, --keyfile   Certificate private key-file associated with the username.\n"
-		"    -f, --function  The action-option combination to perform on the remote server,\n"
-		"                      which must be specified in the format 'action-id:option-id'.\n"
-		"    -u, --user      The username authorized to perform the requested function, with\n"
-		"                      the specified private key-file.\n"
-		"    -t, --target    The hostname or IPv4/6 address of the target CSPAuthD server.\n"
-		"    -p, --port      The (optional) target port to send the request to. This option,\n"
-		"                      if unspecified, sets to the default CSPAuthD port of 41937.\n"
-		"    -w, --wait      The time in seconds to wait for a response from the SPA server.\n"
-		"                      If unspecified, the client won't wait for a response at all.\n"
-		"    -d, --data      The data to send with the packet. If unspecified, the client\n"
-		"                      will generate randomized data to send to the server.\n"
-		"\n"
-		"\n"
-	);
-	exit( 1 );
+    printf(
+        "Usage: cspauth [-?hx46] {-k key-file} {-f function} {-u username} {-t target}\n"
+        "                   [-w wait-time] [-p port] [-d data]\n"
+        "\n"
+        "Sends a Single Packet Authorization request to the target host for the requested\n"
+        "  function, with the specified credentials. Responses can be awaited, or the\n"
+        "  client can be set to 'fire-and-forget' the request.\n"
+        "\n"
+        "Options:\n"
+        "    -h, --help      Display this help.\n"
+        "    -x, --debug     Display client debugging information.\n"
+        "    -4/-6           Force an IPv4 or IPv6 connection only.\n"
+        "    -k, --keyfile   Certificate private key-file associated with the username.\n"
+        "    -f, --function  The action-option combination to perform on the remote server,\n"
+        "                      which must be specified in the format 'action-id:option-id'.\n"
+        "    -u, --user      The username authorized to perform the requested function, with\n"
+        "                      the specified private key-file.\n"
+        "    -t, --target    The hostname or IPv4/6 address of the target CSPAuthD server.\n"
+        "    -p, --port      The (optional) target port to send the request to. This option,\n"
+        "                      if unspecified, sets to the default CSPAuthD port of 41937.\n"
+        "    -w, --wait      The time in seconds to wait for a response from the SPA server.\n"
+        "                      If unspecified, the client won't wait for a response at all.\n"
+        "    -d, --data      The data to send with the packet. If unspecified, the client\n"
+        "                      will generate randomized data to send to the server.\n"
+        "\n"
+        "\n"
+    );
+    exit( 1 );
 }
 
 
@@ -89,56 +89,56 @@ void print_hex( BYTE* data, size_t len );
 
 
 int main( int argc, char** argv ) {
-	// Initial registrations and client setup.
-	register_signals();
-	openssl_init();
-	setbuf( stdout, NULL );
-	setbuf( stderr, NULL );
+    // Initial registrations and client setup.
+    register_signals();
+    openssl_init();
+    setbuf( stdout, NULL );
+    setbuf( stderr, NULL );
 
 
-	// Parse options.
-	struct option cli_long_opts[] = {
-		{ "help",      no_argument,        NULL,  'h' },
-		{ "debug",     no_argument,        NULL,  'x' },
-		{ "wait",      required_argument,  NULL,  'w' },
-		{ "keyfile",   required_argument,  NULL,  'k' },
-		{ "function",  required_argument,  NULL,  'f' },
-		{ "user",      required_argument,  NULL,  'u' },
-		{ "target",    required_argument,  NULL,  't' },
-		{ "port",      required_argument,  NULL,  'p' },
-		{ "data",      required_argument,  NULL,  'd' },
-		{ 0,           0,                  0,     0   }
-	};
-	int cli_opt_idx = 0;
-	int cli_opt;
+    // Parse options.
+    struct option cli_long_opts[] = {
+        { "help",      no_argument,        NULL,  'h' },
+        { "debug",     no_argument,        NULL,  'x' },
+        { "wait",      required_argument,  NULL,  'w' },
+        { "keyfile",   required_argument,  NULL,  'k' },
+        { "function",  required_argument,  NULL,  'f' },
+        { "user",      required_argument,  NULL,  'u' },
+        { "target",    required_argument,  NULL,  't' },
+        { "port",      required_argument,  NULL,  'p' },
+        { "data",      required_argument,  NULL,  'd' },
+        { 0,           0,                  0,     0   }
+    };
+    int cli_opt_idx = 0;
+    int cli_opt;
 
 
-	BYTE key_file_c[PATH_MAX];
-	BYTE* p_key_file = &key_file_c[0];
-	memset( p_key_file, 0, PATH_MAX );
+    BYTE key_file_c[PATH_MAX];
+    BYTE* p_key_file = &key_file_c[0];
+    memset( p_key_file, 0, PATH_MAX );
 
-	BYTE user_c[SPA_PACKET_USERNAME_SIZE];
-	BYTE* p_user = &user_c[0];
-	memset( p_user, 0, SPA_PACKET_USERNAME_SIZE );
+    BYTE user_c[SPA_PACKET_USERNAME_SIZE];
+    BYTE* p_user = &user_c[0];
+    memset( p_user, 0, SPA_PACKET_USERNAME_SIZE );
 
-	BYTE tgtnode_c[MAX_TARGET_STRLEN];
-	BYTE* p_tgtnode = &tgtnode_c[0];
-	memset( p_tgtnode, 0, MAX_TARGET_STRLEN );
+    BYTE tgtnode_c[MAX_TARGET_STRLEN];
+    BYTE* p_tgtnode = &tgtnode_c[0];
+    memset( p_tgtnode, 0, MAX_TARGET_STRLEN );
 
-	BYTE data_c[SPA_PACKET_DATA_SIZE];
-	BYTE* p_data = &data_c[0];
-	memset( p_data, 0, SPA_PACKET_DATA_SIZE );
+    BYTE data_c[SPA_PACKET_DATA_SIZE];
+    BYTE* p_data = &data_c[0];
+    memset( p_data, 0, SPA_PACKET_DATA_SIZE );
 
-	uint16_t tgtport = 0;
-	uint16_t action = 0;
-	uint16_t option = 1;   //option is assumed as '1' when it's not provided
-	uint16_t wait_time = 0;
-	int is_debug = OFF;
-	int is_ipv4 = OFF;
-	int is_ipv6 = OFF;
+    uint16_t tgtport = 0;
+    uint16_t action = 0;
+    uint16_t option = 1;   //option is assumed as '1' when it's not provided
+    uint16_t wait_time = 0;
+    int is_debug = OFF;
+    int is_ipv4 = OFF;
+    int is_ipv6 = OFF;
 
-	// Show help/usage on no parameters.
-	if ( argc <= 1 )  __print_usage_info();
+    // Show help/usage on no parameters.
+    if ( argc <= 1 )  __print_usage_info();
 
 	// Parse the options.
 	for ( ; ; ) {
@@ -294,7 +294,7 @@ int main( int argc, char** argv ) {
 
 
 	// Set up the target address socket.
-	malloc_sizeof( struct addrinfo, p_hints );
+    struct addrinfo* p_hints = (struct addrinfo*)calloc( 1, sizeof(struct addrinfo) );
 	struct addrinfo* p_res   = NULL;   //results **
 	struct addrinfo* p_res_i = NULL;   //results iterator
 
@@ -327,126 +327,131 @@ int main( int argc, char** argv ) {
 	}
 
 	// iterate the returned address details
-	void* p_addr = malloc( sizeof(struct sockaddr_in6) );
-	memset( p_addr, 0, sizeof(struct sockaddr_in6) );
+    void* p_addr = calloc( 1, sizeof(struct sockaddr_in6) );
 
-	int addrfam = -1;
-	char* p_ipchoice = NULL;
+    int addrfam = -1;
+    char* p_ipchoice = NULL;
 
-	for ( p_res_i = p_res; p_res_i != NULL; p_res_i = p_res_i->ai_next ) {
-		void* p_foundaddr = NULL;
-		void* p_addr_tmp = NULL;
+    for ( p_res_i = p_res; p_res_i != NULL; p_res_i = p_res_i->ai_next ) {
+        void* p_foundaddr = NULL;
+        void* p_addr_tmp = NULL;
 
-		if ( p_res_i->ai_family != AF_INET && is_ipv4 == ON )  continue;
-		else if ( p_res_i->ai_family != AF_INET6 && is_ipv6 == ON )  continue;
+        if ( p_res_i->ai_family != AF_INET && is_ipv4 == ON )  continue;
+        else if ( p_res_i->ai_family != AF_INET6 && is_ipv6 == ON )  continue;
 
-		if ( p_res_i->ai_family == AF_INET ) {
-			struct sockaddr_in* p_ip4  = (struct sockaddr_in*)p_res_i->ai_addr;
-			p_ip4->sin_port = htons( tgtport );
-			p_foundaddr = &p_ip4->sin_addr;
-			p_addr_tmp = p_ip4;
-		} else if ( p_res_i->ai_family == AF_INET6 ) {
-			struct sockaddr_in6* p_ip6 = (struct sockaddr_in6*)p_res_i->ai_addr;
-			p_ip6->sin6_port = htons( tgtport );
-			p_foundaddr = &p_ip6->sin6_addr;
-			p_addr_tmp = p_ip6;
-		} else  continue;
+        if ( AF_INET == p_res_i->ai_family ) {
+            struct sockaddr_in* p_ip4  = (struct sockaddr_in*)(p_res_i->ai_addr);
+            p_ip4->sin_port = htons( tgtport );
+            p_foundaddr = &p_ip4->sin_addr;
+            p_addr_tmp = p_ip4;
+        } else if ( AF_INET6 == p_res_i->ai_family ) {
+            struct sockaddr_in6* p_ip6 = (struct sockaddr_in6*)(p_res_i->ai_addr);
+            p_ip6->sin6_port = htons( tgtport );
+            p_foundaddr = &p_ip6->sin6_addr;
+            p_addr_tmp = p_ip6;
+        } else  continue;
 
-		char ipstr[INET6_ADDRSTRLEN];
-		memset( ipstr, 0, INET6_ADDRSTRLEN );
-		if ( inet_ntop( p_res_i->ai_family, p_foundaddr, ipstr, INET6_ADDRSTRLEN ) != NULL ) {
-			__debug( printf( "+++++ Got address '%s'\n", ipstr ); )
-			if ( addrfam == -1 && p_addr_tmp != NULL ) {
-				addrfam = p_res_i->ai_family;
-				memcpy( p_addr, p_addr_tmp,
-					((addrfam == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)) );
-				p_ipchoice = &ipstr[0];
-			}
-		}
-	}
+        char ipstr[INET6_ADDRSTRLEN];
+        memset( ipstr, 0, INET6_ADDRSTRLEN );
+        if (  NULL != inet_ntop( p_res_i->ai_family, p_foundaddr, ipstr, INET6_ADDRSTRLEN )  ) {
+            __debug( printf( "+++++ Got address '%s'\n", ipstr ); )
+            if ( -1 == addrfam && NULL != p_addr_tmp ) {
+                addrfam = p_res_i->ai_family;
+                memcpy( p_addr, p_addr_tmp,
+                    ((addrfam == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)) );
+                p_ipchoice = &ipstr[0];
+            }
+        }
+    }
 
-	if ( addrfam == -1 )
-		errx( 1, "No valid addresses matching the specified address family were found.\n" );
-
-# ifdef DEBUG
-	__debug(
-		printf( "SOCKADDR object dump:\n" );
-		print_hex( (BYTE*)p_addr, addrfam == AF_INET
-			? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) );
-	)
-# endif
-
-	free( p_hints );
-	freeaddrinfo( p_res );
-
-	// Create the socket
-	__debug( printf( "+++ Creating UDP socket.\n" ); )
-	int sockfd = 0;
-	if ( (sockfd = socket(addrfam,SOCK_DGRAM,0)) == -1 )  err( 1, "socket" );
-	__debug( printf( "+++++ Socket ready.\n\n" ); )
-
-
-	// Construct the packet.
-	malloc_sizeof( struct spa_packet_t, p_packet );
-
-	time_t now;
-	time( &now );
-	uint64_t timestamp = (uint64_t)now;
-
-	__debug( printf( "+++ Populating packet fields.\n" ); )
-	memcpy( &p_packet->packet_data[0], p_data, SPA_PACKET_DATA_SIZE );
-	__debug( printf( "+++++ Packet username: '%s'\n", p_user ); )
-	memcpy( &p_packet->username, p_user, SPA_PACKET_USERNAME_SIZE );
-	__debug( printf( "+++++ Timestamp: %lu\n", timestamp ); )
-	p_packet->client_timestamp = timestamp;
-	__debug( printf( "+++++ Function action: %d\n", action ); )
-	p_packet->request_action = action;
-	__debug( printf( "+++++ Function option: %d\n", option ); )
-	p_packet->request_option = option;
-	__debug( printf( "+++++ Generating packet hash.\n" ); )
-	if ( (hash_packet( &p_packet->packet_hash[0], p_packet )) <= 0 )
-		errx( 1, "Failed to hash the SPA packet.\n" );
-	__debug( printf( "+++++ Generating packet signature.\n" ); )
-	if ( (sign_packet( p_key_file, p_packet, &is_debug )) != EXIT_SUCCESS )
-		errx( 1," Failed to generate packet crypto signature.\n" );
-	__debug( printf( "+++ Packet generated and fields populated.\n\n" ); )
-
-	// Calculate the packet size.
-	size_t dispatch_len = SPA_PACKET_MIN_SIZE + p_packet->signature_length;
-
-	if ( dispatch_len < SPA_PACKET_MIN_SIZE || dispatch_len > SPA_PACKET_MAX_SIZE )
-		errx( 1, "Illegal packet length. x != %lu <= x <= %lu\n", SPA_PACKET_MIN_SIZE, SPA_PACKET_MAX_SIZE );
+    if ( NULL == p_ipchoice || -1 == addrfam )
+        errx( 1, "No valid addresses matching the specified address family were found.\n" );
 
 # ifdef DEBUG
-	__debug(
-		printf( "Packet dump '%lu':\n", dispatch_len );
-		print_hex( (BYTE*)p_packet, dispatch_len );
-	)
+    __debug(
+        printf( "SOCKADDR object dump:\n" );
+        print_hex( (BYTE*)p_addr, addrfam == AF_INET
+            ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) );
+    )
+# endif
+
+    free( p_hints );
+    freeaddrinfo( p_res );
+
+    // Create the socket
+    __debug( printf( "+++ Creating UDP socket.\n" ); )
+    int sockfd = 0;
+    if (  -1 == (sockfd = socket(addrfam,SOCK_DGRAM,0))  )
+        err( 1, "socket" );
+
+    __debug( printf( "+++++ Socket ready.\n\n" ); )
+
+
+    // Construct the packet.
+    spa_packet_t* p_packet = (spa_packet_t*)calloc( 1, sizeof(spa_packet_t) );
+
+    time_t now;
+    time( &now );
+    uint64_t timestamp = (uint64_t)now;
+
+    __debug( printf( "+++ Populating packet fields.\n" ); )
+    memcpy( &p_packet->packet_data[0], p_data, SPA_PACKET_DATA_SIZE );
+    __debug( printf( "+++++ Packet username: '%s'\n", p_user ); )
+    memcpy( &p_packet->username, p_user, SPA_PACKET_USERNAME_SIZE );
+    __debug( printf( "+++++ Timestamp: %lu\n", timestamp ); )
+    p_packet->client_timestamp = timestamp;
+    __debug( printf( "+++++ Function action: %d\n", action ); )
+    p_packet->request_action = action;
+    __debug( printf( "+++++ Function option: %d\n", option ); )
+    p_packet->request_option = option;
+    __debug( printf( "+++++ Generating packet hash.\n" ); )
+    if (  0 >= hash_packet( &p_packet->packet_hash[0], p_packet )  )
+        errx( 1, "Failed to hash the SPA packet.\n" );
+    __debug( printf( "+++++ Generating packet signature.\n" ); )
+    if (  EXIT_SUCCESS != sign_packet( p_key_file, p_packet, &is_debug )  )
+        errx( 1," Failed to generate packet crypto signature.\n" );
+    __debug( printf( "+++ Packet generated and fields populated.\n\n" ); )
+
+    // Calculate the packet size.
+    size_t dispatch_len = SPA_PACKET_MIN_SIZE + p_packet->signature_length;
+
+    if (  dispatch_len < SPA_PACKET_MIN_SIZE || dispatch_len > SPA_PACKET_MAX_SIZE  )
+        errx( 1, "Illegal packet length. x != %lu <= x <= %lu\n", SPA_PACKET_MIN_SIZE, SPA_PACKET_MAX_SIZE );
+
+# ifdef DEBUG
+    __debug(
+        printf( "Packet dump '%lu':\n", dispatch_len );
+        print_hex( (BYTE*)p_packet, dispatch_len );
+    )
 # endif
 
 
-	// Use the socket to send the data.
-	printf( "Sending %lu bytes of prepared SPA packet to '[%s]:%d'.\n", dispatch_len, p_ipchoice, tgtport );
+    // Use the socket to send the data.
+    printf( "Sending %lu bytes of prepared SPA packet to '[%s]:%d'.\n",
+        dispatch_len, p_ipchoice, tgtport );
 
-	int sentbytes = -1;
-	sentbytes = sendto(
-		sockfd, (BYTE*)p_packet, dispatch_len, 0, (struct sockaddr*)p_addr,
-		(socklen_t)( (addrfam == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) )
-	);
+    int sentbytes = -1;
+    sentbytes = sendto(
+        sockfd, (BYTE*)p_packet, dispatch_len, 0, (struct sockaddr*)p_addr,
+        (socklen_t)( (addrfam == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) )
+    );
 
-	if ( sentbytes < 0 )  err( 1, "sendto" );
-	free( p_addr );
-	free( p_packet );
-	__debug( printf( "+++++ Sent %d bytes of data.\n", sentbytes ); )
+    if ( sentbytes < 0 )
+        err( 1, "sendto" );
 
-	printf( " === Packet dispatched successfully.\n\n" );
+    free( p_addr );
+    free( p_packet );
+    __debug( printf( "+++++ Sent %d bytes of data.\n", sentbytes ); )
+
+    printf( " === Packet dispatched successfully.\n\n" );
 
 
 	// Based on application options, either fire-and-forget or wait for a response.
 	if ( wait_time > 0 ) {
 
 		__debug( printf( "+++ Setting socket RCVTIMEO option: %d\n", wait_time ); )
-		malloc_sizeof( struct timeval, p_tv );
+        struct timeval* p_tv = (struct timeval*)calloc( 1, sizeof(struct timeval) );
+
 		p_tv->tv_sec = wait_time;
 		if ( (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, p_tv, sizeof(struct timeval) )) < 0 )
 			err( 1, "setsockopt: SO_RCVTIMEO" );
@@ -473,13 +478,15 @@ int main( int argc, char** argv ) {
 
 		__debug( printf( "\n+++ Received %lu bytes of UDP response socket data.\n", recvbytes ); )
 
-		if ( recvbytes != sizeof(struct spa_response_packet_t) )
+		if ( recvbytes != sizeof(spa_response_packet_t) )
 			errx( 1, " === Received a response packet that was not the expected size. Exiting now.\n\n" );
 
 
 		// "Cast" and parse the response.
-		malloc_sizeof( struct spa_response_packet_t, p_response );
-		memcpy( p_response, &recv_buffer[0], sizeof(struct spa_response_packet_t) );
+        spa_response_packet_t* p_response =
+            (spa_response_packet_t*)calloc( 1, sizeof(spa_response_packet_t) );
+
+		memcpy( p_response, &recv_buffer[0], sizeof(spa_response_packet_t) );
 		p_response->response_data[SPA_RESPONSE_STRLEN-1] = '\0';   //force null-term
 
 		printf(

@@ -28,26 +28,26 @@ void openssl_init() {
 
 
 int sha256_digest( BYTE* dest_buffer, const void* src_buffer, int buffer_len ) {
-	int retcode = EXIT_FAILURE;
+    int retcode = EXIT_FAILURE;
 
-	SHA256_CTX sha_ctx;
-	memset( &sha_ctx, 0, sizeof(SHA256_CTX) );
+    SHA256_CTX sha_ctx;
+    memset( &sha_ctx, 0, sizeof(SHA256_CTX) );
 
-	if ( SHA256_Init( &sha_ctx ) != 1 )  return retcode;
-	if ( SHA256_Update( &sha_ctx, src_buffer, buffer_len ) != 1 )  return retcode;
-	if ( SHA256_Final( dest_buffer, &sha_ctx ) != 1 )  return retcode;
+    if ( SHA256_Init( &sha_ctx ) != 1 )  return retcode;
+    if ( SHA256_Update( &sha_ctx, src_buffer, buffer_len ) != 1 )  return retcode;
+    if ( SHA256_Final( dest_buffer, &sha_ctx ) != 1 )  return retcode;
 
-	return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 }
 
 
 
-int hash_packet( BYTE* dst_buffer, struct spa_packet_t* p_packet ) {
-	BYTE hashed_content[SPA_PACKET_HASHED_SECTION_LEN];
-	memcpy( &hashed_content[0], p_packet, SPA_PACKET_HASHED_SECTION_LEN );
+int hash_packet( BYTE* dst_buffer, spa_packet_t* p_packet ) {
+    BYTE hashed_content[SPA_PACKET_HASHED_SECTION_LEN];
+    memcpy( &hashed_content[0], p_packet, SPA_PACKET_HASHED_SECTION_LEN );
 
-	if ( sha256_digest( dst_buffer, hashed_content, SPA_PACKET_HASHED_SECTION_LEN ) == EXIT_FAILURE )
-		return -1;
+    if (  sha256_digest( dst_buffer, hashed_content, SPA_PACKET_HASHED_SECTION_LEN ) == EXIT_FAILURE  )
+        return -1;
 
-	return SHA256_DIGEST_LENGTH;
+    return SHA256_DIGEST_LENGTH;
 }
