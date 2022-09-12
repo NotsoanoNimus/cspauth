@@ -36,7 +36,7 @@
 
 
 #define __debug( ... ) \
-	if ( is_debug == ON ) {  __VA_ARGS__ }
+    if ( is_debug == ON ) {  __VA_ARGS__ }
 
 #define MAX_TARGET_STRLEN 256
 
@@ -45,7 +45,7 @@
 
 
 
-void __print_usage_info() {
+void print_usage_info() {
     printf(
         "Usage: cspauth [-?hx46] {-k key-file} {-f function} {-u username} {-t target}\n"
         "                   [-w wait-time] [-p port] [-d data]\n"
@@ -136,200 +136,201 @@ int main( int argc, char** argv ) {
     uint16_t action = 0;
     uint16_t option = 1;   //option is assumed as '1' when it's not provided
     uint16_t wait_time = 0;
+
     int is_debug = OFF;
     int is_ipv4 = OFF;
     int is_ipv6 = OFF;
 
     // Show help/usage on no parameters.
-    if ( argc <= 1 )  __print_usage_info();
+    if ( argc <= 1 )  print_usage_info();
 
-	// Parse the options.
-	for ( ; ; ) {
-		cli_opt = getopt_long( argc, argv, "hx46w:k:f:u:t:p:d:", cli_long_opts, &cli_opt_idx );
-		if ( cli_opt == -1 )  break;
-		switch ( cli_opt ) {
-			case '?':
-			case 'h':
-			default :   //(flag) help/usage
-				__print_usage_info();
-				break;
+    // Parse the options.
+    for ( ; ; ) {
+        cli_opt = getopt_long( argc, argv, "hx46w:k:f:u:t:p:d:", cli_long_opts, &cli_opt_idx );
+        if ( cli_opt == -1 )  break;
+        switch ( cli_opt ) {
+            case '?':
+            case 'h':
+            default :   //(flag) help/usage
+                print_usage_info();
+                break;
 
-			case 'x':   //(flag) debug
-				if ( is_debug == ON )
-					errx( 1, "The debug option can only be specified once.\n" );
-				is_debug = ON;
-				break;
+            case 'x':   //(flag) debug
+                if ( is_debug == ON )
+                    errx( 1, "The debug option can only be specified once.\n" );
+                is_debug = ON;
+                break;
 
-			case '4':   //(flag) ipv4
-				if ( is_ipv4 == ON )
-					errx( 1, "The IPv4 option can only be specified once.\n" );
-				is_ipv4 = ON;
-				break;
+            case '4':   //(flag) ipv4
+                if ( is_ipv4 == ON )
+                    errx( 1, "The IPv4 option can only be specified once.\n" );
+                is_ipv4 = ON;
+                break;
 
-			case '6':   //(flag) ipv6
-				if ( is_ipv6 == ON )
-					errx( 1, "The IPv6 option can only be specified once.\n" );
-				is_ipv6 = ON;
-				break;
+            case '6':   //(flag) ipv6
+                if ( is_ipv6 == ON )
+                    errx( 1, "The IPv6 option can only be specified once.\n" );
+                is_ipv6 = ON;
+                break;
 
-			case 'w':   //wait (for SPA server response) for x seconds
-				if ( wait_time != 0 )
-					errx( 1, "The wait timeout can only be defined once.\n" );
+            case 'w':   //wait (for SPA server response) for x seconds
+                if ( wait_time != 0 )
+                    errx( 1, "The wait timeout can only be defined once.\n" );
 
-				wait_time = get_valid_uint16( optarg, "Wait timeout" );
-				if ( wait_time > CLIENT_MAX_WAIT_TIME )
-					errx( 1, "The maximum SPA client wait-time is %d seconds.\n", CLIENT_MAX_WAIT_TIME );
-				else if ( wait_time < CLIENT_MIN_WAIT_TIME )
-					errx( 1, "The minimum SPA client wait-time is %d seconds.\n", CLIENT_MIN_WAIT_TIME );
+                wait_time = get_valid_uint16( optarg, "Wait timeout" );
+                if ( wait_time > CLIENT_MAX_WAIT_TIME )
+                    errx( 1, "The maximum SPA client wait-time is %d seconds.\n", CLIENT_MAX_WAIT_TIME );
+                else if ( wait_time < CLIENT_MIN_WAIT_TIME )
+                    errx( 1, "The minimum SPA client wait-time is %d seconds.\n", CLIENT_MIN_WAIT_TIME );
 
-				break;
+                break;
 
-			case 'k':   //keyfile
-				if ( strnlen( (const char*)p_key_file, PATH_MAX ) != 0 )
-					errx( 1, "Key-file can only be defined once.\n" );
+            case 'k':   //keyfile
+                if ( strnlen( (const char*)p_key_file, PATH_MAX ) != 0 )
+                    errx( 1, "Key-file can only be defined once.\n" );
 
-				memcpy( p_key_file, optarg, strnlen(optarg,PATH_MAX) );
-				p_key_file[PATH_MAX-1] = '\0';   //force null-term
-				break;
+                memcpy( p_key_file, optarg, strnlen(optarg,PATH_MAX) );
+                p_key_file[PATH_MAX-1] = '\0';   //force null-term
+                break;
 
-			case 'f':   //function
-				if ( action != 0 )
-					errx( 1, "The function to call cannot be defined twice.\n" );
+            case 'f':   //function
+                if ( action != 0 )
+                    errx( 1, "The function to call cannot be defined twice.\n" );
 
-				const char delim[] = ":";
+                const char delim[] = ":";
 
-				char* func = strndup( optarg, 13 );   //never needs to be more than 13 chars
-				if ( func == NULL )
-					errx( 1, "Function option requires a valid argument.\n" );
+                char* func = strndup( optarg, 13 );   //never needs to be more than 13 chars
+                if ( func == NULL )
+                    errx( 1, "Function option requires a valid argument.\n" );
 
-				// get action
-				char* x = strtok( func, delim );
-				action = get_valid_uint16( x, "Function action" );
+                // get action
+                char* x = strtok( func, delim );
+                action = get_valid_uint16( x, "Function action" );
 
-				// get option (if set)
-				char* y = strtok( NULL, delim );
-				// If an option is defined, set it if it's valid.
-				option = (y != NULL) ? get_valid_uint16( y, "Function option" ) : 1;
+                // get option (if set)
+                char* y = strtok( NULL, delim );
+                // If an option is defined, set it if it's valid.
+                option = (y != NULL) ? get_valid_uint16( y, "Function option" ) : 1;
 
-				break;
+                break;
 
-			case 'u':   //user
-				if ( strnlen( (const char*)p_user, SPA_PACKET_USERNAME_SIZE ) != 0 )
-					errx( 1, "Username can only be defined once.\n" );
+            case 'u':   //user
+                if ( strnlen( (const char*)p_user, SPA_PACKET_USERNAME_SIZE ) != 0 )
+                    errx( 1, "Username can only be defined once.\n" );
 
-				memcpy( p_user, optarg, strnlen(optarg,SPA_PACKET_USERNAME_SIZE) );
+                memcpy( p_user, optarg, strnlen(optarg,SPA_PACKET_USERNAME_SIZE) );
 
-				if ( strnlen( (const char*)optarg, SPA_PACKET_USERNAME_SIZE ) > SPA_PACKET_USERNAME_SIZE-1 )
-					fprintf( stderr, "WARNING: Given username was longer than the "
-						"%d character limit. Value truncated.\n", SPA_PACKET_USERNAME_SIZE-1 );
+                if ( strnlen( (const char*)optarg, SPA_PACKET_USERNAME_SIZE ) > SPA_PACKET_USERNAME_SIZE-1 )
+                    fprintf( stderr, "WARNING: Given username was longer than the "
+                        "%d character limit. Value truncated.\n", SPA_PACKET_USERNAME_SIZE-1 );
 
-				p_user[SPA_PACKET_USERNAME_SIZE-1] = '\0';   //force null-term
-				break;
+                p_user[SPA_PACKET_USERNAME_SIZE-1] = '\0';   //force null-term
+                break;
 
-			case 't':   //target
-				if ( strnlen( (const char*)p_tgtnode, MAX_TARGET_STRLEN ) != 0 )
-					errx( 1, "Target address can only be defined once.\n" );
+            case 't':   //target
+                if ( strnlen( (const char*)p_tgtnode, MAX_TARGET_STRLEN ) != 0 )
+                    errx( 1, "Target address can only be defined once.\n" );
 
-				memcpy( p_tgtnode, optarg, strnlen(optarg,MAX_TARGET_STRLEN) );
+                memcpy( p_tgtnode, optarg, strnlen(optarg,MAX_TARGET_STRLEN) );
 
-				p_tgtnode[MAX_TARGET_STRLEN-1] = '\0';   //force null-term
-				break;
+                p_tgtnode[MAX_TARGET_STRLEN-1] = '\0';   //force null-term
+                break;
 
-			case 'p':   //port
-				if ( tgtport != 0 )
-					errx( 1, "The target port can only be defined once.\n" );
+            case 'p':   //port
+                if ( tgtport != 0 )
+                    errx( 1, "The target port can only be defined once.\n" );
 
-				tgtport = get_valid_uint16( optarg, "Target port" );
-				break;
+                tgtport = get_valid_uint16( optarg, "Target port" );
+                break;
 
-			case 'd':   //data
-				if ( strnlen( (const char*)p_data, SPA_PACKET_DATA_SIZE ) != 0 )
-					errx( 1, "Data can only be defined once.\n" );
+            case 'd':   //data
+                if ( strnlen( (const char*)p_data, SPA_PACKET_DATA_SIZE ) != 0 )
+                    errx( 1, "Data can only be defined once.\n" );
 
-				memcpy( p_data, optarg, strnlen(optarg,SPA_PACKET_DATA_SIZE) );
+                memcpy( p_data, optarg, strnlen(optarg,SPA_PACKET_DATA_SIZE) );
 
-				if ( strnlen( (const char*)optarg, SPA_PACKET_DATA_SIZE ) > SPA_PACKET_DATA_SIZE-1 )
-					fprintf( stderr, "WARNING: Given data field was longer than the "
-						"%d character limit. Value truncated.\n", SPA_PACKET_DATA_SIZE-1 );
+                if ( strnlen( (const char*)optarg, SPA_PACKET_DATA_SIZE ) > SPA_PACKET_DATA_SIZE-1 )
+                    fprintf( stderr, "WARNING: Given data field was longer than the "
+                        "%d character limit. Value truncated.\n", SPA_PACKET_DATA_SIZE-1 );
 
-				p_data[SPA_PACKET_DATA_SIZE-1] = '\0';   //force null-term
-				break;
-		}
-	}
-
-
-	// Check that all required variables are initialized.
-	if ( action == 0 )
-		errx( 1, "The function action must be set to a non-zero option; see the 'f' option.\n" );
-	if ( strnlen( (const char*)p_key_file, PATH_MAX ) <= 0 )
-		errx( 1, "A valid key-file must be defined with the 'k' option.\n" );
-	if ( strnlen( (const char*)p_user, SPA_PACKET_USERNAME_SIZE ) <= 0 )
-		errx( 1, "A username must be defined with the 'u' option.\n" );
-	if ( strnlen( (const char*)p_tgtnode, MAX_TARGET_STRLEN ) <= 0 )
-		errx( 1, "A target IP or hostname must be defined with the 't' option.\n" );
-	if ( is_ipv4 == ON && is_ipv6 == ON ) {
-		// if both flags are provided, the user just doesn't care about the addr type.
-		//   this is the default behavior anyway; no sense in throwing another error, just clear flags
-		is_ipv4 = OFF;
-		is_ipv6 = OFF;
-	}
-	FILE* fp = NULL;
-	if ( (fp = fopen((const char*)p_key_file,"r")) == NULL )
-		errx( 1, "Failed to read key file '%s'.\n", p_key_file );
-	fclose( fp );
+                p_data[SPA_PACKET_DATA_SIZE-1] = '\0';   //force null-term
+                break;
+        }
+    }
 
 
-	// BEING STDOUT CLI OUTPUT WHERE APPLICABLE.
-	printf( "\n" );
+    // Check that all required variables are initialized.
+    if ( action == 0 )
+        errx( 1, "The function action must be set to a non-zero option; see the 'f' option.\n" );
+    if ( strnlen( (const char*)p_key_file, PATH_MAX ) <= 0 )
+        errx( 1, "A valid key-file must be defined with the 'k' option.\n" );
+    if ( strnlen( (const char*)p_user, SPA_PACKET_USERNAME_SIZE ) <= 0 )
+        errx( 1, "A username must be defined with the 'u' option.\n" );
+    if ( strnlen( (const char*)p_tgtnode, MAX_TARGET_STRLEN ) <= 0 )
+        errx( 1, "A target IP or hostname must be defined with the 't' option.\n" );
+    if ( is_ipv4 == ON && is_ipv6 == ON ) {
+        // if both flags are provided, the user just doesn't care about the addr type.
+        //   this is the default behavior anyway; no sense in throwing another error, just clear flags
+        is_ipv4 = OFF;
+        is_ipv6 = OFF;
+    }
+    FILE* fp = NULL;
+    if ( (fp = fopen((const char*)p_key_file,"r")) == NULL )
+        errx( 1, "Failed to read key file '%s'.\n", p_key_file );
+    fclose( fp );
 
-	// Set defaults as needed.
-	if ( tgtport == 0 ) {
-		printf( "* Port unspecified; using default cspauthd port of '%d'.\n\n", SPA_DEFAULT_BIND_PORT );
-		tgtport = SPA_DEFAULT_BIND_PORT;   //assumes default cspauthd port
-	}
-	if ( strnlen( (const char*)p_data, SPA_PACKET_DATA_SIZE ) <= 0 ) {
-		__debug( printf( "+ Unspecified data string; generating random data.\n" ); )
-		// if the data field is not set, randomize the data
-		srandom( (unsigned int)time(NULL) );
-		for ( BYTE* p = p_data; p < (p_data+SPA_PACKET_DATA_SIZE); p++ )
-			*p = (BYTE)(random() & 0xFF);
-	}
+
+    // BEING STDOUT CLI OUTPUT WHERE APPLICABLE.
+    printf( "\n" );
+
+    // Set defaults as needed.
+    if ( tgtport == 0 ) {
+        printf( "* Port unspecified; using default cspauthd port of '%d'.\n\n", SPA_DEFAULT_BIND_PORT );
+        tgtport = SPA_DEFAULT_BIND_PORT;   //assumes default cspauthd port
+    }
+    if ( strnlen( (const char*)p_data, SPA_PACKET_DATA_SIZE ) <= 0 ) {
+        __debug( printf( "+ Unspecified data string; generating random data.\n" ); )
+        // if the data field is not set, randomize the data
+        srandom( (unsigned int)time(NULL) );
+        for ( BYTE* p = p_data; p < (p_data+SPA_PACKET_DATA_SIZE); p++ )
+            *p = (BYTE)(random() & 0xFF);
+    }
 
 
-	// Set up the target address socket.
+    // Set up the target address socket.
     struct addrinfo* p_hints = (struct addrinfo*)calloc( 1, sizeof(struct addrinfo) );
-	struct addrinfo* p_res   = NULL;   //results **
-	struct addrinfo* p_res_i = NULL;   //results iterator
+    struct addrinfo* p_res   = NULL;   //results **
+    struct addrinfo* p_res_i = NULL;   //results iterator
 
-	// If IPv4 is set statically, use that family only. Same for v6. Else, get any returned address
-	p_hints->ai_flags = 0;
-	if ( is_ipv4 == ON ) {
-		printf( "Using IPv4 address family only." );
-		p_hints->ai_family = AF_INET;
-	} else if ( is_ipv6 == ON ) {
-		printf( "Using IPv6 address family only." );
-		p_hints->ai_family = AF_INET6;
-	} else {
-		printf( "Using any address family." );
-		p_hints->ai_family = AF_UNSPEC;
-		p_hints->ai_flags = AI_ADDRCONFIG;   //get IPs based on local address/adapter configurations
-	}
-	printf( "\n\n" );
-	p_hints->ai_socktype = SOCK_DGRAM;
+    // If IPv4 is set statically, use that family only. Same for v6. Else, get any returned address
+    p_hints->ai_flags = 0;
+    if ( is_ipv4 == ON ) {
+        printf( "Using IPv4 address family only." );
+        p_hints->ai_family = AF_INET;
+    } else if ( is_ipv6 == ON ) {
+        printf( "Using IPv6 address family only." );
+        p_hints->ai_family = AF_INET6;
+    } else {
+        printf( "Using any address family." );
+        p_hints->ai_family = AF_UNSPEC;
+        p_hints->ai_flags = AI_ADDRCONFIG;   //get IPs based on local address/adapter configurations
+    }
+    printf( "\n\n" );
+    p_hints->ai_socktype = SOCK_DGRAM;
 
-	// convert the target port to a string safely.
-	char port_c[6] = {0};
-	snprintf( &port_c[0], 6, "%d", tgtport );
-	port_c[5] = '\0';
+    // convert the target port to a string safely.
+    char port_c[6] = {0};
+    snprintf( &port_c[0], 6, "%d", tgtport );
+    port_c[5] = '\0';
 
-	__debug( printf( "Getting IPs from input string '%s'.\n", p_tgtnode ); )
-	int __addrinfo_rc = getaddrinfo( (const char*)p_tgtnode, &port_c[0], p_hints, &p_res );
-	if ( __addrinfo_rc != 0 ) {
-		fprintf( stderr, "getaddrinfo: %s\n", gai_strerror(__addrinfo_rc) );
-		exit( 1 );
-	}
+    __debug( printf( "Getting IPs from input string '%s'.\n", p_tgtnode ); )
+    int __addrinfo_rc = getaddrinfo( (const char*)p_tgtnode, &port_c[0], p_hints, &p_res );
+    if ( __addrinfo_rc != 0 ) {
+        fprintf( stderr, "getaddrinfo: %s\n", gai_strerror(__addrinfo_rc) );
+        exit( 1 );
+    }
 
-	// iterate the returned address details
+    // iterate the returned address details
     void* p_addr = calloc( 1, sizeof(struct sockaddr_in6) );
 
     int addrfam = -1;
@@ -449,43 +450,43 @@ int main( int argc, char** argv ) {
     printf( " === Packet dispatched successfully.\n\n" );
 
 
-	// Based on application options, either fire-and-forget or wait for a response.
-	if ( wait_time > 0 ) {
+    // Based on application options, either fire-and-forget or wait for a response.
+    if ( wait_time > 0 ) {
 
-		__debug( printf( "+++ Setting socket RCVTIMEO option: %d\n", wait_time ); )
+        __debug( printf( "+++ Setting socket RCVTIMEO option: %d\n", wait_time ); )
         struct timeval* p_tv = (struct timeval*)calloc( 1, sizeof(struct timeval) );
 
-		p_tv->tv_sec = wait_time;
-		if ( (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, p_tv, sizeof(struct timeval) )) < 0 )
-			err( 1, "setsockopt: SO_RCVTIMEO" );
-		free( p_tv );
+        p_tv->tv_sec = wait_time;
+        if ( (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, p_tv, sizeof(struct timeval) )) < 0 )
+            err( 1, "setsockopt: SO_RCVTIMEO" );
+        free( p_tv );
 
-		size_t recvbytes;
-		BYTE recv_buffer[PACKET_BUFFER_SIZE];
-		memset( &recv_buffer[0], 0, PACKET_BUFFER_SIZE );
+        size_t recvbytes;
+        BYTE recv_buffer[PACKET_BUFFER_SIZE];
+        memset( &recv_buffer[0], 0, PACKET_BUFFER_SIZE );
 
-		printf( "Awaiting UDP response from remote server for %d seconds...\n", wait_time );
-		int remoteaddrlen = ( (addrfam == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) );
-		if ( (recvbytes = recvfrom( sockfd, recv_buffer, PACKET_BUFFER_SIZE,
-				MSG_WAITALL, (struct sockaddr*)&p_addr, (socklen_t*)&remoteaddrlen )) < 0 )
-			err( 1, "recvfrom" );
-		__debug( printf( "+++++ RECVBYTES: %lu\n", recvbytes ); )
+        printf( "Awaiting UDP response from remote server for %d seconds...\n", wait_time );
+        int remoteaddrlen = ( (addrfam == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) );
+        if ( (recvbytes = recvfrom( sockfd, recv_buffer, PACKET_BUFFER_SIZE,
+                MSG_WAITALL, (struct sockaddr*)&p_addr, (socklen_t*)&remoteaddrlen )) < 0 )
+            err( 1, "recvfrom" );
+        __debug( printf( "+++++ RECVBYTES: %lu\n", recvbytes ); )
 
-		// Usually ridiculous numbers from the socket indicate a signal was trapped.
-		//   In such events, the main thread should just quietly continue to run.
-		if ( recvbytes <= 0 || recvbytes > UINT32_MAX-1 ) {
-			__debug( printf( "~~~ Received 0 or > uint32_t length packet; invalid response.\n" ); )
-			printf( " === Listening socket timed out.\n\n" );
-			exit( 0 );
-		}
+        // Usually ridiculous numbers from the socket indicate a signal was trapped.
+        //   In such events, the main thread should just quietly continue to run.
+        if ( recvbytes <= 0 || recvbytes > UINT32_MAX-1 ) {
+            __debug( printf( "~~~ Received 0 or > uint32_t length packet; invalid response.\n" ); )
+            printf( " === Listening socket timed out.\n\n" );
+            exit( 0 );
+        }
 
-		__debug( printf( "\n+++ Received %lu bytes of UDP response socket data.\n", recvbytes ); )
+        __debug( printf( "\n+++ Received %lu bytes of UDP response socket data.\n", recvbytes ); )
 
         if ( recvbytes != sizeof(spa_response_packet_t) )
             errx( 1, " === Received a response packet that was not the expected size. Exiting now.\n\n" );
 
 
-		// "Cast" and parse the response.
+        // "Cast" and parse the response.
         spa_response_packet_t* p_response =
             (spa_response_packet_t*)calloc( 1, sizeof(spa_response_packet_t) );
 
