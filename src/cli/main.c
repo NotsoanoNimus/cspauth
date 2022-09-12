@@ -82,6 +82,9 @@ uint16_t get_valid_uint16( char* str, char* type );
 void register_signals();
 void handle_signal( int signal );
 
+// Signs a packet and stores its signature on the pointed packet.
+int sign_packet( BYTE* key_file, spa_packet_t* p_packet, int is_debug );
+
 # ifdef DEBUG
 void print_hex( BYTE* data, size_t len );
 # endif
@@ -408,7 +411,7 @@ int main( int argc, char** argv ) {
     if (  0 >= hash_packet( &p_packet->packet_hash[0], p_packet )  )
         errx( 1, "Failed to hash the SPA packet.\n" );
     __debug( printf( "+++++ Generating packet signature.\n" ); )
-    if (  EXIT_SUCCESS != sign_packet( p_key_file, p_packet, &is_debug )  )
+    if (  EXIT_SUCCESS != sign_packet( p_key_file, p_packet, is_debug )  )
         errx( 1," Failed to generate packet crypto signature.\n" );
     __debug( printf( "+++ Packet generated and fields populated.\n\n" ); )
 
@@ -478,91 +481,175 @@ int main( int argc, char** argv ) {
 
 		__debug( printf( "\n+++ Received %lu bytes of UDP response socket data.\n", recvbytes ); )
 
-		if ( recvbytes != sizeof(spa_response_packet_t) )
-			errx( 1, " === Received a response packet that was not the expected size. Exiting now.\n\n" );
+        if ( recvbytes != sizeof(spa_response_packet_t) )
+            errx( 1, " === Received a response packet that was not the expected size. Exiting now.\n\n" );
 
 
 		// "Cast" and parse the response.
         spa_response_packet_t* p_response =
             (spa_response_packet_t*)calloc( 1, sizeof(spa_response_packet_t) );
 
-		memcpy( p_response, &recv_buffer[0], sizeof(spa_response_packet_t) );
-		p_response->response_data[SPA_RESPONSE_STRLEN-1] = '\0';   //force null-term
+        memcpy( p_response, &recv_buffer[0], sizeof(spa_response_packet_t) );
+        p_response->response_data[SPA_RESPONSE_STRLEN-1] = '\0';   //force null-term
 
-		printf(
-			"\n==================================================================\n"
-			"=  RECEIVED SPA RESPONSE:\n"
-			"=    Server version: 0x%08x\n"
-			"=    Response code:  0x%08x\n"
-			"=    Time: %lu\n"
-			"=    Log ID: %lu\n"
-			"=    ---------------------------------------------\n"
-			"=    Message: %s\n=\n"
-			"==================================================================\n\n",
-			p_response->server_version,
-			p_response->response_code,
-			p_response->timestamp,
-			p_response->packet_id,
-			p_response->response_data
-		);
+        printf(
+            "\n==================================================================\n"
+            "=  RECEIVED SPA RESPONSE:\n"
+            "=    Server version: 0x%08x\n"
+            "=    Response code:  0x%08x\n"
+            "=    Time: %lu\n"
+            "=    Log ID: %lu\n"
+            "=    ---------------------------------------------\n"
+            "=    Message: %s\n=\n"
+            "==================================================================\n\n",
+            p_response->server_version,
+            p_response->response_code,
+            p_response->timestamp,
+            p_response->packet_id,
+            p_response->response_data
+        );
 
-		free( p_response );
-	} else {
-		printf( "No timeout/wait was set; not awaiting a SPA response.\n\n" );
-	}
+        free( p_response );
+    } else {
+        printf( "No timeout/wait was set; not awaiting a SPA response.\n\n" );
+    }
 
 
-	// Exit success.
-	__debug( printf( "\n\n=== DONE ===\n\n" ); )
-	exit( 0 );
+    // Exit success.
+    __debug( printf( "\n\n=== DONE ===\n\n" ); )
+    exit( 0 );
 }
 
 
 
 uint16_t get_valid_uint16( char* str, char* type ) {
-	if ( str == NULL || strnlen(str,6) > 5 )
-		errx( 1, "%s is not valid.\n", type );
+    if ( str == NULL || strnlen(str,6) > 5 )
+        errx( 1, "%s is not valid.\n", type );
 
-	for ( int i = 0; i < strnlen(str,6); i++ ) {
-		if ( !isdigit( (int)str[i] ) )
-			errx( 1, "%s is not a valid integer.\n", type );
-	}
+    for ( int i = 0; i < strnlen(str,6); i++ ) {
+        if ( !isdigit( (int)str[i] ) )
+            errx( 1, "%s is not a valid integer.\n", type );
+    }
 
-	uint16_t retval = (uint16_t)atoi( str );
+    uint16_t retval = (uint16_t)atoi( str );
 
-	if ( retval < 1 || retval > UINT16_MAX )
-		errx( 1, "%s must be between 1 and %d.\n", type, UINT16_MAX );
+    if ( retval < 1 || retval > UINT16_MAX )
+        errx( 1, "%s must be between 1 and %d.\n", type, UINT16_MAX );
 
-	return retval;
+    return retval;
 }
 
 
 
 void register_signals() {
-	struct sigaction sa;
-	memset( &sa, 0, sizeof(struct sigaction) );
-	sa.sa_handler = handle_signal;
-	sigaction( SIGINT,  &sa, NULL );
-	sigaction( SIGTERM, &sa, NULL );
-	sigaction( SIGKILL, &sa, NULL );
-	sigaction( SIGHUP,  &sa, NULL );
-	return;
+    struct sigaction sa;
+    memset( &sa, 0, sizeof(struct sigaction) );
+    sa.sa_handler = handle_signal;
+    sigaction( SIGINT,  &sa, NULL );
+    sigaction( SIGTERM, &sa, NULL );
+    sigaction( SIGKILL, &sa, NULL );
+    sigaction( SIGHUP,  &sa, NULL );
+    return;
 }
 
 void handle_signal( int signal ) {
-	fprintf( stderr, "Received signal '%d'. Goodbye.\n", signal );
-	exit( 0 );
+    fprintf( stderr, "Received signal '%d'. Goodbye.\n", signal );
+    exit( 0 );
 }
 
 
 
 # ifdef DEBUG
 void print_hex( BYTE* data, size_t len ) {
-	for ( size_t i = 0; i < len; i++ ) {
-		if ( !(i % 8) )   fprintf(stderr, "  ");
-		if ( !(i % 16) )  fprintf(stderr, "\n");
-		fprintf(stderr, "%02x ", data[i]);
-	}
-	fprintf(stderr, "\n\n");
+    for ( size_t i = 0; i < len; i++ ) {
+        if ( !(i % 8) )   fprintf(stderr, "  ");
+        if ( !(i % 16) )  fprintf(stderr, "\n");
+        fprintf(stderr, "%02x ", data[i]);
+    }
+    fprintf(stderr, "\n\n");
 }
 # endif
+
+
+
+// Verify the actual crypto signature attached to the packet.
+int sign_packet( BYTE* key_file, spa_packet_t* p_packet, int is_debug ) {
+    __debug( printf( "crypto: Checking packet's SHA256 signature with the user's pubkey.\n" ); )
+
+    int rc = -1;
+    FILE* fp = NULL;
+    EVP_PKEY* pkey = NULL;
+
+    EVP_MD_CTX* mdctx = NULL;
+    BYTE* sig = NULL;
+
+    size_t slen = 0;
+
+
+    __debug( printf( "crypto: Attempting to load PEM private key file '%s'.\n", key_file ); )
+    if ( (fp = fopen((const char*)key_file,"r")) == NULL ) {
+        fprintf( stderr, "crypto: Failed to load private key file.\n" );
+        goto __err;
+    }
+
+    __debug( printf( "crypto: Reading PEM from input file pointer.\n" ); )
+    if ( (pkey = PEM_read_PrivateKey(fp,NULL,NULL,NULL)) == NULL ) {
+        fprintf( stderr, "crypto: Failed to read private key from file.\n" );
+        goto __err;
+    }
+
+    fclose( fp );
+
+
+    __debug( printf( "crypto: Creating digest context.\n" ); )
+    if ( !(mdctx = EVP_MD_CTX_create()) )  goto __err;
+
+    __debug( printf( "crypto: Initializing digest context.\n" ); )
+    if ( EVP_DigestSignInit( mdctx, NULL, EVP_sha256(), NULL, pkey ) != 1 )  goto __err;
+
+    __debug( printf( "crypto: Updating digest context.\n" ); )
+    if ( EVP_DigestSignUpdate( mdctx, &p_packet->packet_hash[0], SPA_PACKET_HASH_SIZE ) != 1 )  goto __err;
+
+    __debug( printf( "crypto: Getting final signature buffer length.\n" ); )
+    if ( EVP_DigestSignFinal( mdctx, NULL, &slen ) != 1 )  goto __err;
+
+    __debug( printf( "crypto: Allocating _predicted_ space for signature copy.\n" ); )
+    if ( !(sig = (BYTE*)OPENSSL_malloc( sizeof(BYTE)*slen )) )  goto __err;
+
+    __debug( printf( "crypto: Generating signature...\n" ); )
+    if ( EVP_DigestSignFinal( mdctx, sig, &slen ) != 1 )  goto __err;
+    rc = 1;
+
+    // NOTE: slen gets updated in the final signing above. The initial malloc is to get the POTENTIAL signature size.
+    if ( slen > SPA_PACKET_MAX_SIGNATURE_SIZE ) {
+        fprintf( stderr, "crypto: The final signature exceeds maximum size of %d bytes.\n", SPA_PACKET_MAX_SIGNATURE_SIZE );
+        goto __err;
+    }
+
+    __debug( printf( "crypto: Got valid packet signature with size of %lu bytes.\n", slen ); )
+    p_packet->signature_length = (slen & 0xFFFFFFFF);
+
+    __debug( printf( "crypto: Copying generated signature to packet buffer.\n" ); )
+    memcpy( &p_packet->packet_signature[0], sig, sizeof(BYTE)*slen );
+
+
+    __err:
+    if ( sig != NULL )  OPENSSL_free( sig );
+    if ( mdctx )  EVP_MD_CTX_destroy( mdctx );
+    if ( pkey )  EVP_PKEY_free( pkey );
+
+    if ( rc != 1 ) {
+        __debug( printf( "~~~~~ Signature verification failed. Attempting to get why...\n" ); )
+
+        char* openssl_err = (char*)calloc( 1, 128 );
+
+        ERR_error_string_n( ERR_get_error(), openssl_err, 128 );
+        __debug( printf( "~~~~~  ---> OpenSSL error: %s\n", openssl_err ); )
+
+        free( openssl_err );
+        return EXIT_FAILURE;
+    }
+
+    __debug( printf( "crypto: Packet signature is OK.\n" ); )
+    return EXIT_SUCCESS;
+}

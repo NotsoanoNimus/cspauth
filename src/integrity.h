@@ -39,8 +39,6 @@ void openssl_init();
 int sha256_digest( BYTE* dest_buffer, const void* src_buffer, int buffer_len );
 // Hashes an incoming SPA packet and returns the length of the resulting hash. If <= 0, error.
 int hash_packet( BYTE* dst_buffer, spa_packet_t* p_packet );
-// Signs a packet and stores its signature on the pointed packet.
-int sign_packet( BYTE* key_file, spa_packet_t* p_packet, int* is_debug );
 
 
 
