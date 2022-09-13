@@ -15,12 +15,12 @@
  *
  */
 
-#include "include/conf.h"
-#include "include/log.h"
-#include "include/pki.h"
-#include "include/util.h"
-#include "include/users.h"
-#include "include/action.h"
+#include "conf.h"
+#include "log.h"
+#include "pki.h"
+#include "util.h"
+#include "users.h"
+#include "action.h"
 
 
 

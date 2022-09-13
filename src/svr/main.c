@@ -34,11 +34,11 @@
 
 #include "../spa.h"
 #include "../integrity.h"
-#include "include/log.h"
-#include "include/conf.h"
-#include "include/users.h"
-#include "include/replay.h"
-#include "include/verify.h"
+#include "log.h"
+#include "conf.h"
+#include "users.h"
+#include "replay.h"
+#include "verify.h"
 
 
 

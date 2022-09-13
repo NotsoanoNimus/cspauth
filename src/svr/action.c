@@ -16,9 +16,9 @@
  */
 
 
-#include "include/action.h"
-#include "include/conf.h"
-#include "include/log.h"
+#include "action.h"
+#include "conf.h"
+#include "log.h"
 
 #include <yallic.h>
 

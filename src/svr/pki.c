@@ -16,8 +16,8 @@
  */
 
 
-#include "include/pki.h"
-#include "include/log.h"
+#include "pki.h"
+#include "log.h"
 
 
 

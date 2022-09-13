@@ -17,10 +17,10 @@
  */
 
 
-#include "include/verify.h"
-#include "include/log.h"
-#include "include/pki.h"
-#include "include/conf.h"
+#include "verify.h"
+#include "log.h"
+#include "pki.h"
+#include "conf.h"
 #include "../integrity.h"
 
 

@@ -16,9 +16,9 @@
  */
 
 
-#include "include/replay.h"
-#include "include/log.h"
-#include "include/conf.h"
+#include "replay.h"
+#include "log.h"
+#include "conf.h"
 
 
 
