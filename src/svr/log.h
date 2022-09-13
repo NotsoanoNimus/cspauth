@@ -16,14 +16,6 @@
 #ifndef SPA_LOG_H
 #define SPA_LOG_H
 
-#include <errno.h>
-#include <stdarg.h>
-#include <syslog.h>
-#include <linux/limits.h>
-
-#include "../spa.h"
-#include "conf.h"
-
 
 
 // LOGGING MACROS:
@@ -33,22 +25,22 @@
 //   error_log_append: Same as error_log except it will also get the error string
 
 #define write_log( fmt, ... ) \
-    __write_log( 0, ERROR_NONE, LOG_INFO, fmt, __VA_ARGS__ );
+    SPALog__write( 0, ERROR_NONE, LOG_INFO, fmt, __VA_ARGS__ );
 #define write_syslog( prio, fmt, ... ) \
-    __write_log( 0, (ERROR_NONE | ERROR_SYSLOG), prio, fmt, __VA_ARGS__ );
+    SPALog__write( 0, (ERROR_NONE | ERROR_SYSLOG), prio, fmt, __VA_ARGS__ );
 #define write_error_log( fmt, ... ) \
-    __write_log( 0, (ERROR_NO_APPEND | ERROR_SYSLOG), LOG_ERR, fmt, __VA_ARGS__ );
+    SPALog__write( 0, (ERROR_NO_APPEND | ERROR_SYSLOG), LOG_ERR, fmt, __VA_ARGS__ );
 #define write_error_log_append( fmt, ... ) \
-    __write_log( 0, (ERROR_APPEND | ERROR_SYSLOG), LOG_ERR, fmt, __VA_ARGS__ );
+    SPALog__write( 0, (ERROR_APPEND | ERROR_SYSLOG), LOG_ERR, fmt, __VA_ARGS__ );
 
 // NOTE: packet error logs do NOT send the error types through, since that would
 //   halt the application from the thread.
 #define packet_log( pktid, fmt, ... ) \
-    __write_log( pktid, ERROR_NONE, LOG_INFO, fmt, __VA_ARGS__ );
+    SPALog__write( pktid, ERROR_NONE, LOG_INFO, fmt, __VA_ARGS__ );
 #define packet_syslog( pktid, prio, fmt, ... ) \
-    __write_log( pktid, (ERROR_NONE | ERROR_SYSLOG), prio, fmt, __VA_ARGS__ );
+    SPALog__write( pktid, (ERROR_NONE | ERROR_SYSLOG), prio, fmt, __VA_ARGS__ );
 #define packet_error_log( pktid, fmt, ... ) \
-    __write_log( pktid, (ERROR_NONE | ERROR_SYSLOG), LOG_ERR, fmt, __VA_ARGS__ );
+    SPALog__write( pktid, (ERROR_NONE | ERROR_SYSLOG), LOG_ERR, fmt, __VA_ARGS__ );
 
 // Log levels should only EVER be checked _AFTER_ the config has been loaded and validated.
 #define __debuglog( ... ) \
@@ -62,6 +54,7 @@
 
 
 
+// Define a set of log types to indicate the appropriate action.
 typedef enum spa_log_type_t {
     // Normal message; no error
     ERROR_NONE      = (1 << 1),
@@ -75,19 +68,14 @@ typedef enum spa_log_type_t {
 
 
 
-void syslog_init();
-uint64_t generate_packet_id();
-void __write_log(
+// SPA Logging functions.
+void SPALog__write(
     uint64_t packet_id,
     LOG_TYPE log_type,
     int log_priority,
     const char* format,
     ...
 );
-
-# ifdef DEBUG
-void print_hex( char* data, size_t len );
-# endif
 
 
 

@@ -31,6 +31,8 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <ifaddrs.h>
+#include <syslog.h>
+#include <linux/limits.h>
 
 #include "../spa.h"
 #include "../integrity.h"
@@ -48,12 +50,14 @@ sa_family_t listen_family = -1;
 
 
 
+uint64_t generate_packet_id();
 void* handle_packet( void* packet );
 int send_response( uint64_t* packet_id, struct sockaddr_in6* p_clientaddr,
     uint16_t response_code, BYTE* response_msg );
 void spawn_socket();
 void register_signals();
 void handle_signal( int signal );
+void syslog_init();
 void daemonize();
 
 
@@ -459,6 +463,19 @@ void* handle_packet( void* p_packet_meta ) {
 
 
 
+uint64_t generate_packet_id() {
+    uint64_t r = 0;
+
+    for ( int i = 0; i< 64; i+= RAND_MAX_WIDTH ) {
+        r <<= RAND_MAX_WIDTH;
+        r ^= (unsigned)rand();
+    }
+
+    return r;
+}
+
+
+
 int send_response( uint64_t* packet_id, struct sockaddr_in6* p_clientaddr,
     uint16_t response_code, BYTE* response_msg ) {
 /*
@@ -768,6 +785,15 @@ void handle_signal( int signal ) {
         write_syslog( LOG_WARNING, "Received signal '%d'. Goodbye.\n", signal );
         exit( 0 );
     }
+}
+
+void syslog_init() {
+    openlog(
+        (const char*)(&(spa_process.syslog_tag[0])),
+        (LOG_CONS | LOG_NDELAY | LOG_PID),
+        LOG_DAEMON
+    );
+    SPALog__write( LOG_NOTICE, "Initializing.\n", NULL );
 }
 
 
