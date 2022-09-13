@@ -60,7 +60,6 @@ int SPAAction__perform(
     spa_packet_meta_t* p_packet_meta,
     sa_family_t* listen_family
 );
-int substitute_packet_data( char* p_action_str );
 
 
 

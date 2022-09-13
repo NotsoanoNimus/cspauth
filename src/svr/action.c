@@ -20,22 +20,27 @@
 #include "conf.h"
 #include "log.h"
 
-#include <yallic.h>
+
+
+// Allocate a pointer array space on the heap to dynamically manage loaded actions.
+//   The point of this space is to remove the project dependency on linked lists.
+static void* p_actions_base = calloc( 1, (sizeof(spa_action_t*) * SPA_MAX_ACTIONS) );
+static unsigned long actions_count = 0;
 
 
 
-// Use a static-scoped runtime linked list that's refreshed as needed.
-static List_t* p_actions_list = List__new( SPA_MAX_ACTIONS );
-
-
-
-// Return the internal list's length.
-size_t SPAAction__get_loaded_count() {
-    return List__length( p_actions_list );
+// Return the internal array's length.
+unsigned long SPAAction__count() {
+    return actions_count;
 }
-// Deeply clear the internal list.
-void SPAAction__clear_all_loaded() {
-    List__clear_deep( p_actions_list );
+
+// Deeply clear the heap array.
+void SPAAction__clear() {
+    for ( unsigned long x = 0; x < actions_count; x++ )
+        free( (p_actions_base+(sizeof(spa_action_t*)*x)) );
+
+    memset(  p_actions_base, 0, (sizeof(spa_action_t*) * SPA_MAX_ACTIONS)  );
+    actions_count = 0;
 }
 
 
@@ -44,13 +49,10 @@ spa_action_t* SPAAction__get( uint16_t action ) {
     if (  EXIT_SUCCESS == get_config_flag( SPA_CONF_FLAG_GENERIC_ACTION )  ) {
         __debuglog(  write_log( "+++ Skipping action ID check: generic_action is set.\n", NULL );  )
         return &(spa_conf.generic_action);
-    }
+    } else if ( 0 == actions_count )  return NULL;
 
-    size_t len = SPAAction__get_loaded_count();
-    if ( len <= 0 )  return NULL;
-
-    for ( size_t x = 0; x < len; x++ ) {
-        spa_action_t* p_item = (spa_action_t*)(List__get_at_index( p_actions_list, x ));
+    for ( size_t x = 0; x < actions_count; x++ ) {
+        spa_action_t* p_item = (spa_action_t*)(p_actions_base + (sizeof(spa_action_t*)*x));
         if (  action == p_item->action_id  )
             return p_item;
     }
@@ -64,7 +66,11 @@ spa_action_t* SPAAction__get( uint16_t action ) {
 spa_action_t* SPAAction__add( uint16_t action, const char* command ) {
     if (  EXIT_SUCCESS == get_config_flag( SPA_CONF_FLAG_GENERIC_ACTION )  ) {
         write_syslog( LOG_WARNING, "WARNING: Ignoring action with ID %d because"
-            " the generic_action option is set.\n", *p_action_id );
+            " the generic_action option is set.\n", action );
+        return NULL;
+    } else if ( actions_count >= SPA_MAX_ACTIONS ) {
+        write_syslog( LOG_WARNING, "WARNING: The maximum amount of actions has"
+            " been loaded. Skipping action '%d'.\n", action );
         return NULL;
     }
 
@@ -75,10 +81,8 @@ spa_action_t* SPAAction__add( uint16_t action, const char* command ) {
     memcpy( &(p_action->command[0]), command, strlen(command) );
     p_action->command[SPA_MAX_ACTION_CMD_LEN-1] = '\0';
 
-    if (  -1 == List__push( p_actions_list, p_action )  ) {
-        free( p_action );
-        return NULL;
-    }
+    *((spa_action_t**)(p_actions_base + (sizeof(spa_action_t*)*actions_count))) = p_action;
+    actions_count++;
 
     return p_action;
 }
@@ -87,15 +91,16 @@ spa_action_t* SPAAction__add( uint16_t action, const char* command ) {
 
 // Actually perform the requested action/option combination.
 #define SPA_EXP_ACTION_MAX_STRLEN 1024
-char* __spa_action_get_token_value(
+static inline char* spa_action_get_token_value(
     const char* token_name,
     spa_packet_meta_t* p_packet_meta,
     sa_family_t* listen_family
 );
+static inline int substitute_packet_data( char* p_action_str );
 
 int SPAAction__perform(
     spa_action_t* p_action,
-    struct spa_packet_meta_t* p_packet_meta,
+    spa_packet_meta_t* p_packet_meta,
     sa_family_t* listen_family
 ) {
     if ( spa_char_subs.count > 0 ) {
@@ -122,7 +127,10 @@ int SPAAction__perform(
     char* __p_exp_action_tmp = (char*)calloc( 1, SPA_EXP_ACTION_MAX_STRLEN );
 
     for ( size_t i = 0; i < sizeof(tokens)/sizeof(*tokens); i++ ) {
-        __debuglog( packet_log( p_packet_meta->packet_id, "Expanding action token: '%s'\n", tokens[i] ); )
+        __debuglog(
+            packet_log( p_packet_meta->packet_id,
+                "Expanding action token: '%s'\n", tokens[i] );
+        )
 
         // Each time the loop starts, the updated action string should be copied in.
         memset( __p_exp_action_tmp, 0, SPA_EXP_ACTION_MAX_STRLEN );
@@ -145,7 +153,7 @@ __debuglog( packet_log( p_packet_meta->packet_id, " `---> Action found token '%s
                 strncat( (char*)__p_exp_action_tmp, (char*)p_save, (ptr-p_save) );
 
                 // Get the expanded content and append it.
-                char* p_expansion = __spa_action_get_token_value(
+                char* p_expansion = spa_action_get_token_value(
                     (const char*)tokens[i], p_packet_meta, listen_family );
 
                 if ( NULL == p_expansion ) {
@@ -233,9 +241,9 @@ __debuglog( packet_log( p_packet_meta->packet_id, " `---> Action found token '%s
 
 
 // Token expansions from packet meta info.
-char*  __spa_action_get_token_value(
+static inline char* spa_action_get_token_value(
     const char* token_name,
-    struct spa_packet_meta_t* p_packet_meta,
+    spa_packet_meta_t* p_packet_meta,
     sa_family_t* listen_family
 ) {
     // The expanded data can be _AT MOST_ the size of the UNSAFE_DATA expansion.
@@ -311,7 +319,7 @@ char*  __spa_action_get_token_value(
 
 
 
-int substitute_packet_data( char* p_action_str ) {
+static inline int substitute_packet_data( char* p_action_str ) {
 # ifdef DEBUG
 __debuglog(
     printf( "Packet Data hexdump BEFORE:\n" );
@@ -327,7 +335,7 @@ __debuglog(
             }
         }
         __next_subst:
-            __asm__ __volatile__("nop");
+            continue
     }
 
 # ifdef DEBUG
