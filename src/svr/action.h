@@ -16,14 +16,6 @@
 #ifndef SPA_ACTION_H
 #define SPA_ACTION_H
 
-
-
-#include <arpa/inet.h>
-
-#include "../../spa.h"
-
-
-
 #define SPA_MAX_ACTIONS 1024
 #define SPA_MAX_OPTS_PER_ACTION 29
 #define SPA_SPA_MAX_ACTION_CMD_LEN 254
@@ -31,26 +23,27 @@
 
 
 
-// Actions are processed when the daemon starts.
+// Actions are processed when the daemon starts and live in the heap.
 typedef struct spa_action_t {
     uint16_t action_id;
     char command[SPA_SPA_MAX_ACTION_CMD_LEN];
 } spa_action_t;
 
-
-
-struct spa_packet_data_replacement_t {
+// Simple character substitution structure for expanding action string directives/tokens.
+typedef struct _spa_character_substitution_t {
     char before;
     char after;
-};
+} spa_subst_t;
 
+// This is a global/static list of all loaded character substitutions.
 struct spa_dynamic_substitutions_t {
-    struct spa_packet_data_replacement_t list[SPA_MAX_ACTION_SUBSTITUTIONS];
+    spa_subst_t list[SPA_MAX_ACTION_SUBSTITUTIONS];
     uint16_t count;
 } spa_char_subs;
 
 
 
+// Methods for accessing or manipulating loaded SPA actions.
 size_t SPAAction__count();
 void SPAAction__clear();
 spa_action_t* SPAAction__get( uint16_t action );

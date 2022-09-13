@@ -17,8 +17,12 @@
 
 
 #include "action.h"
+
+#include "../spa.h"
 #include "conf.h"
 #include "log.h"
+
+#include <arpa/inet.h>
 
 
 
