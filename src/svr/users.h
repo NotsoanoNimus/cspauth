@@ -80,5 +80,12 @@ int dump_user_autls(spa_user_t* p_user_data, FILE* stream );
 int is_user_authorized( spa_user_t* p_user_data, uint16_t* action_id, uint16_t* option );
 
 
+// PKEY for user and related functions.
+// Load an X509 public key from a filename.
+int load_user_pkey( spa_user_t* p_user_data, char* p_pem_filename );
+// Get the validity of a pkey without saving/changing anything.
+int get_user_pkey( spa_user_t* p_user_data );
+
+
 
 #endif   /* SPA_USERS_H */
