@@ -112,7 +112,7 @@ typedef struct _spa_packet_t {
     char packet_hash[SPA_PACKET_HASH_SIZE];
     uint32_t signature_length;
     char packet_signature[SPA_PACKET_MAX_SIGNATURE_SIZE];
-} spa_packet_t; //__attribute__((__packed__));
+} spa_packet_t;
 
 // Wrapper struct for meta-data about an incoming SPA packet.
 typedef struct spa_packet_meta_t {

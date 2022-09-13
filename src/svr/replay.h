@@ -23,7 +23,7 @@
 // Initialization function for the monitor thread.
 int SPAReplay__init();
 // Record a SHA256 hash into the linked list.
-void SPAReplay__add( char* hash, uint64_t* time );
+void SPAReplay__add( char* hash, uint64_t time );
 // Check the hash against all valid records after a cleanup.
 int SPAReplay__check( char* hash );
 

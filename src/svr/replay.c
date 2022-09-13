@@ -56,25 +56,6 @@ static pthread_mutex_t spa_replay_record_lock = PTHREAD_MUTEX_INITIALIZER;
 
 
 
-// Push a new hash onto the array
-static inline void _spa_replay_record_push( char* hash, uint64_t time ) {
-    pthread_mutex_lock( &spa_replay_record_lock );
-
-    list_node_t* p_new = (list_node_t*)calloc( 1, sizeof(list_node_t) );
-
-    memcpy( &((p_new->record).hash), hash, SPA_PACKET_HASH_SIZE );
-    (p_new->record).time = time;
-
-    // Set the next ptr to the old HEAD and set the HEAD to the newly alloc'd item. Quick insertion.
-    p_new->p_next = hashes.p_head;
-    hashes.p_head = p_new;
-
-    hashes_count++;
-    pthread_mutex_unlock( &spa_replay_record_lock );
-}
-
-
-
 // Drop all records from memory which are older than now minus the validity window.
 //   THIS SHOULD ALWAYS BE RUN BEFORE QUERYING ANY RECORDS.
 static void* _spa_replay_record_cleanup( void* nonce ) {
@@ -163,6 +144,9 @@ static void* _spa_replay_record_cleanup( void* nonce ) {
             pthread_mutex_unlock( &spa_replay_record_lock );
             sleep( MIN_VALIDITY_WINDOW );
     }
+
+    // This should never be reached, but the compiler cries because void* :)
+    return NULL;
 }
 
 
@@ -199,6 +183,25 @@ int SPAReplay__init() {
 
     // OK.
     return EXIT_SUCCESS;
+}
+
+
+
+// Add a replay record to the linked list (wrapper function.
+void SPAReplay__add( char* hash, uint64_t time ) {
+    pthread_mutex_lock( &spa_replay_record_lock );
+
+    list_node_t* p_new = (list_node_t*)calloc( 1, sizeof(list_node_t) );
+
+    memcpy( &((p_new->record).hash), hash, SPA_PACKET_HASH_SIZE );
+    (p_new->record).time = time;
+
+    // Set the next ptr to the old HEAD and set the HEAD to the newly alloc'd item. Quick insertion.
+    p_new->p_next = hashes.p_head;
+    hashes.p_head = p_new;
+
+    hashes_count++;
+    pthread_mutex_unlock( &spa_replay_record_lock );
 }
 
 

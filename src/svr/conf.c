@@ -494,12 +494,12 @@ int SPAConf__parse( const char* p_conf_path ) {
             }
 
             // Make sure this isn't a duplicate action.
-            if (  NULL != SPAAction__get( &action_id )  ) {
+            if (  NULL != SPAAction__get( action_id )  ) {
                 write_error_log( "Config line #%d: Action with ID '%d' is "
                     "already defined.", line_num, action_id );
             }
 
-            if (  NULL == SPAAction__add( &action_id, val )  ) {
+            if (  NULL == SPAAction__add( action_id, val )  ) {
                 write_error_log( "Config line #%d: Unspecified error creating "
                     "action with ID '%d'.\n", line_num, action_id );
             }

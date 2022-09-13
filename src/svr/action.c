@@ -18,7 +18,6 @@
 
 #include "action.h"
 
-#include "../spa.h"
 #include "conf.h"
 #include "log.h"
 
@@ -127,7 +126,7 @@ int SPAAction__perform(
 
     char* p_exp_action = (char*)calloc( 1, SPA_EXP_ACTION_MAX_STRLEN );
     memcpy(  p_exp_action, p_action->command,
-        strnlen( (const char*)(p_action->command), SPA_MAX_ACTION_CMD_LEN )  );
+        strnlen( p_action->command, SPA_MAX_ACTION_CMD_LEN )  );
     p_exp_action[SPA_MAX_ACTION_CMD_LEN] = '\0';   // force null-term
 
 
@@ -136,7 +135,7 @@ int SPAAction__perform(
 
     const char* tokens[] = { "[[OPTION]]", "[[ACTION]]", "[[USER]]", "[[SRCIP]]", "[[IPFAM]]",
         "[[SRCPT]]", "[[TIME]]", "[[UNSAFE_DATA]]" };
-    char* __p_exp_action_tmp = (char*)calloc( 1, SPA_EXP_ACTION_MAX_STRLEN );
+    char* p_exp_action_tmp = (char*)calloc( 1, SPA_EXP_ACTION_MAX_STRLEN );
 
     for ( size_t i = 0; i < sizeof(tokens)/sizeof(*tokens); i++ ) {
         __debuglog(
@@ -145,24 +144,26 @@ int SPAAction__perform(
         )
 
         // Each time the loop starts, the updated action string should be copied in.
-        memset( __p_exp_action_tmp, 0, SPA_EXP_ACTION_MAX_STRLEN );
-        //memcpy( __p_exp_action_tmp, p_exp_action, SPA_EXP_ACTION_MAX_STRLEN );
+        memset( p_exp_action_tmp, 0, SPA_EXP_ACTION_MAX_STRLEN );
 
         // Iterate the updated action string for occurrences of the current token. Found tokens
         //   get inflated into the temp string.
-        char* p_save = &p_exp_action[0];
-        for ( char* ptr = &p_exp_action[0]; *ptr != (char)'\0'; ptr += sizeof(char) ) {
+        char* p_save = p_exp_action;
+        for ( char* ptr = p_exp_action; *ptr; ptr++ ) {
             // Exit the loop if the strlen plus the token width exceeds the string bounds from the orig cmd.
-            int token_len = strnlen( (const char*)tokens[i], 16 );
-            if ( (ptr + token_len) > &p_exp_action[SPA_MAX_ACTION_CMD_LEN-1] )  break;
+            int token_len = strnlen( tokens[i], 16 );
+            if ( (ptr + token_len) > &p_exp_action[SPA_MAX_ACTION_CMD_LEN-1] )
+                break;
 
-            if ( strncmp( (const char*)ptr, tokens[i], token_len ) == 0 ) {
+            if (  0 == strncmp( ptr, tokens[i], token_len )  ) {
 # ifdef DEBUG
-__debuglog( packet_log( p_packet_meta->packet_id, " `---> Action found token '%s' at pos %d.\n",
-    tokens[i], (ptr-&p_exp_action[0]) ); )
+__debuglog(
+    packet_log( p_packet_meta->packet_id, " `---> Action found token '%s' at pos %d.\n",
+        tokens[i], (ptr - p_exp_action) );
+)
 # endif
                 // Append the part of the original string from the save ptr, up to the token.
-                strncat( (char*)__p_exp_action_tmp, (char*)p_save, (ptr-p_save) );
+                strncat( p_exp_action_tmp, p_save, (ptr - p_save) );
 
                 // Get the expanded content and append it.
                 char* p_expansion = spa_action_get_token_value(
@@ -170,7 +171,7 @@ __debuglog( packet_log( p_packet_meta->packet_id, " `---> Action found token '%s
 
                 if ( NULL == p_expansion ) {
                     free( p_exp_action );
-                    free( __p_exp_action_tmp );
+                    free( p_exp_action_tmp );
                     __normallog(
                         packet_syslog( p_packet_meta->packet_id, LOG_WARNING, "WARNING: The expanded action string"
                             " was either invalid (unsafe-data) or the token type was somehow incorrect.\n", NULL );
@@ -178,11 +179,15 @@ __debuglog( packet_log( p_packet_meta->packet_id, " `---> Action found token '%s
                     return EXIT_FAILURE;
                 }
 
-                if ( (strnlen( (const char*)__p_exp_action_tmp, SPA_EXP_ACTION_MAX_STRLEN+1 )
-                        + strnlen( (const char*)p_expansion, SPA_PACKET_DATA_SIZE+1 )) > SPA_EXP_ACTION_MAX_STRLEN ) {
+                if (
+                    (
+                        strnlen( p_exp_action_tmp, SPA_EXP_ACTION_MAX_STRLEN+1 )
+                            + strnlen( p_expansion, SPA_PACKET_DATA_SIZE+1 )
+                    ) > SPA_EXP_ACTION_MAX_STRLEN
+                ) {
                     // Bounds exceeded for the string. Don't perform the action.
                     free( p_exp_action );
-                    free( __p_exp_action_tmp );
+                    free( p_exp_action_tmp );
                     free( p_expansion );
                     __normallog(
                         packet_syslog( p_packet_meta->packet_id, LOG_WARNING, "WARNING: The expanded action"
@@ -190,7 +195,9 @@ __debuglog( packet_log( p_packet_meta->packet_id, " `---> Action found token '%s
                     )
                     return EXIT_FAILURE;
                 }
-                strncat ( (char*)__p_exp_action_tmp, (char*)p_expansion, SPA_PACKET_DATA_SIZE );
+
+                // Otherwise, append.
+                strncat ( p_exp_action_tmp, p_expansion, SPA_PACKET_DATA_SIZE );
 
                 // Jump over the token by strlen and set the new save ptr.
                 ptr += token_len;
@@ -201,45 +208,55 @@ __debuglog( packet_log( p_packet_meta->packet_id, " `---> Action found token '%s
         }
 
         // Finally, push the final part of the string on and len-check it once again.
-        if ( (strnlen( (const char*)__p_exp_action_tmp, SPA_EXP_ACTION_MAX_STRLEN+1 )
-            + strnlen( (const char*)p_save, SPA_EXP_ACTION_MAX_STRLEN+1 )) > SPA_EXP_ACTION_MAX_STRLEN ) {
+        if (
+            (
+                strnlen( p_exp_action_tmp, SPA_EXP_ACTION_MAX_STRLEN+1 )
+                    + strnlen( p_save, SPA_EXP_ACTION_MAX_STRLEN+1 )
+            ) > SPA_EXP_ACTION_MAX_STRLEN
+        ) {
                     // Bounds exceeded for the string. Don't perform the action.
                     free( p_exp_action );
-                    free( __p_exp_action_tmp );
+                    free( p_exp_action_tmp );
                     __normallog(
                         packet_syslog( p_packet_meta->packet_id, LOG_WARNING, "WARNING: The expanded action"
                             " string tried to write out-of-bounds. Failing action.\n", NULL );
                     )
                     return EXIT_FAILURE;
         }
-        strncat( (char*)__p_exp_action_tmp, (char*)p_save, SPA_EXP_ACTION_MAX_STRLEN );
+
+        // Otherwise, apppend.
+        strncat( p_exp_action_tmp, p_save, SPA_EXP_ACTION_MAX_STRLEN );
 
         // ... And when the loop finalizes, the updated/expanded string overwrites the original buffer.
         memset( p_exp_action, 0, SPA_EXP_ACTION_MAX_STRLEN );
-        memcpy( p_exp_action, __p_exp_action_tmp, SPA_EXP_ACTION_MAX_STRLEN );
+        memcpy( p_exp_action, p_exp_action_tmp, SPA_EXP_ACTION_MAX_STRLEN );
     }
 
     // At long last, update the original action string.
-    memcpy( p_exp_action, __p_exp_action_tmp, SPA_EXP_ACTION_MAX_STRLEN );
+    memcpy( p_exp_action, p_exp_action_tmp, SPA_EXP_ACTION_MAX_STRLEN );
     p_exp_action[SPA_EXP_ACTION_MAX_STRLEN - 1] = '\0';   // force null-term
-    free( __p_exp_action_tmp );
+
+    free( p_exp_action_tmp );
+
 
     // =========================================================================
     // =========================================================================
 
 
-    __debuglog( packet_log( p_packet_meta->packet_id,
-        "Performing expanded action string: <<<|%s|>>>\n", p_exp_action ); )
+    __debuglog(
+        packet_log( p_packet_meta->packet_id,
+            "Performing expanded action string: <<<|%s|>>>\n", p_exp_action );
+    )
 
-    int rc = system( (const char*)p_exp_action );
-    if ( SPAConf__get_flag( SPA_CONF_FLAG_LOG_EXIT_CODES ) == EXIT_SUCCESS ) {
+    int rc = system( p_exp_action );
+    if (  EXIT_SUCCESS == SPAConf__get_flag( SPA_CONF_FLAG_LOG_EXIT_CODES )  ) {
         packet_syslog(
             p_packet_meta->packet_id,
             ( rc == 0 ) ? LOG_NOTICE : LOG_WARNING,
             "%s: action <<<|%s|>>> returned exit code '%d'.\n",
             (( rc == 0 ) ? "NOTICE" : "WARNING"), p_exp_action, rc
         );
-    } else if ( rc != 0 ) {
+    } else if ( 0 != rc ) {
         __normallog(
             packet_syslog( p_packet_meta->packet_id, LOG_WARNING,
                 "WARNING: performed action returned non-zero exit code '%d'.\n", rc );
@@ -259,74 +276,101 @@ static inline char* spa_action_get_token_value(
     sa_family_t* listen_family
 ) {
     // The expanded data can be _AT MOST_ the size of the UNSAFE_DATA expansion.
-    char* p_expanded_token = (char*)malloc( SPA_PACKET_DATA_SIZE+1 );
-    memset( &p_expanded_token[0], 0, SPA_PACKET_DATA_SIZE+1 );
+    char* p_expanded_token = (char*)calloc( 1, (SPA_PACKET_DATA_SIZE+1) );
 
     // Only forced validation is that the string is NOT printing control characters.
-    if ( strcmp( token_name, "[[OPTION]]" ) == 0 ) {
-        sprintf( (char*)&p_expanded_token[0], "%d", p_packet_meta->packet.request_option );
+    if (  0 == strcmp( token_name, "[[OPTION]]" )  ) {
+        sprintf( p_expanded_token, "%d", (p_packet_meta->packet).request_option );
 
-    } else if ( strcmp( token_name, "[[ACTION]]" ) == 0 ) {
-        sprintf( (char*)&p_expanded_token[0], "%d", p_packet_meta->packet.request_action );
+    } else if (  0 == strcmp( token_name, "[[ACTION]]" )  ) {
+        sprintf( p_expanded_token, "%d", (p_packet_meta->packet).request_action );
 
-    } else if ( strcmp( token_name, "[[USER]]" ) == 0 ) {
-        snprintf( (char*)&p_expanded_token[0], SPA_PACKET_USERNAME_SIZE, "%s",
-            (const char*)p_packet_meta->packet.username );
+    } else if (  0 == strcmp( token_name, "[[USER]]" )  ) {
+        snprintf(
+            p_expanded_token, SPA_PACKET_USERNAME_SIZE, "%s",
+            (const char*)((p_packet_meta->packet).username)
+        );
         p_expanded_token[SPA_PACKET_USERNAME_SIZE] = '\0';
 
-    } else if ( strcmp( token_name, "[[SRCIP]]" ) == 0 ) {
+    } else if (  0 == strcmp( token_name, "[[SRCIP]]" )  ) {
         char client_addr[INET6_ADDRSTRLEN];
         memset( &client_addr[0], 0, INET6_ADDRSTRLEN );
-        if ( *listen_family == AF_INET ||  (
-                (SPAConf__get_flag( SPA_CONF_FLAG_NO_IPV4_MAPPING ) == EXIT_SUCCESS) &&
+
+        if ( AF_INET == *listen_family ||  (
+                (EXIT_SUCCESS == SPAConf__get_flag( SPA_CONF_FLAG_NO_IPV4_MAPPING )) &&
                 (IN6_IS_ADDR_V4MAPPED(&(p_packet_meta->clientaddr.sin6_addr)))
         )  ) {
-            __debuglog( packet_log( p_packet_meta->packet_id, "*** Shrinking clientaddr to IPv4 sockaddr.\n", NULL ); )
-            malloc_sizeof( struct sockaddr_in, p_ip4 );
+            __debuglog(
+                packet_log( p_packet_meta->packet_id,
+                    "*** Shrinking clientaddr to IPv4 sockaddr.\n", NULL );
+            )
+
+            struct sockaddr_in* p_ip4 =
+                (struct sockaddr_in*)calloc( 1, sizeof(struct sockaddr_in) );
             p_ip4->sin_family = AF_INET;
             p_ip4->sin_port = p_packet_meta->clientaddr.sin6_port;
-            memcpy( &p_ip4->sin_addr, &p_packet_meta->clientaddr.sin6_addr.s6_addr[12], 4 );
-            if ( (inet_ntop( AF_INET, &p_ip4->sin_addr, client_addr, INET_ADDRSTRLEN )) == NULL ) {
-                __debuglog( packet_log( p_packet_meta->packet_id, "***** Unable to get SRCIP (v4) expansion.\n", NULL ); )
+            memcpy( &p_ip4->sin_addr, &((p_packet_meta->clientaddr).sin6_addr.s6_addr[12]), 4 );
+
+            if (  NULL == (inet_ntop( AF_INET, &(p_ip4->sin_addr), client_addr, INET_ADDRSTRLEN ))  ) {
+                __debuglog(
+                    packet_log( p_packet_meta->packet_id,
+                        "***** Unable to get SRCIP (v4) expansion.\n", NULL );
+                )
                 free( p_expanded_token );
                 free( p_ip4 );
                 return NULL;
             }
+
             free( p_ip4 );
         } else {
-            __debuglog( packet_log( p_packet_meta->packet_id, "*** Using clientaddr as IPv6 sockaddr.\n", NULL ); )
-            if ( (inet_ntop( AF_INET6, &p_packet_meta->clientaddr.sin6_addr, client_addr, INET6_ADDRSTRLEN )) == NULL ) {
-                __debuglog( packet_log( p_packet_meta->packet_id, "***** Unable to get SRCIP (v6) expansion.\n", NULL ); )
+            __debuglog(
+                packet_log( p_packet_meta->packet_id,
+                    "*** Using clientaddr as IPv6 sockaddr.\n", NULL );
+            )
+
+            if (
+                NULL == (inet_ntop( AF_INET6, &((p_packet_meta->clientaddr).sin6_addr),
+                    client_addr, INET6_ADDRSTRLEN ))
+            ) {
+                __debuglog(
+                    packet_log( p_packet_meta->packet_id,
+                        "***** Unable to get SRCIP (v6) expansion.\n", NULL );
+                )
                 free( p_expanded_token );
                 return NULL;
             }
         }
-        snprintf( (char*)&p_expanded_token[0], INET6_ADDRSTRLEN+1, "%s", client_addr );
+
+        snprintf( p_expanded_token, INET6_ADDRSTRLEN+1, "%s", client_addr );
         p_expanded_token[INET6_ADDRSTRLEN] = '\0';
 
-    } else if ( strcmp( token_name, "[[IPFAM]]" ) == 0 ) {
-        p_expanded_token[0] = ( *listen_family == AF_INET ) ? '4' : '6';
+    } else if (  0 == strcmp( token_name, "[[IPFAM]]" )  ) {
+        p_expanded_token[0] = ( AF_INET == *listen_family ) ? '4' : '6';
         p_expanded_token[1] = '\0';
 
-    } else if ( strcmp( token_name, "[[SRCPT]]" ) == 0 ) {
-        sprintf( (char*)&p_expanded_token[0], "%d", p_packet_meta->clientaddr.sin6_port );
+    } else if (  0 == strcmp( token_name, "[[SRCPT]]" )  ) {
+        sprintf( p_expanded_token, "%d", (p_packet_meta->clientaddr).sin6_port );
 
-    } else if ( strcmp( token_name, "[[TIME]]" ) == 0 ) {
-        sprintf( (char*)&p_expanded_token[0], "%lu", p_packet_meta->packet.client_timestamp );
+    } else if (  0 == strcmp( token_name, "[[TIME]]" )  ) {
+        sprintf( p_expanded_token, "%lu", (p_packet_meta->packet).client_timestamp );
 
-    } else if ( strcmp( token_name, "[[UNSAFE_DATA]]" ) == 0 ) {
-        snprintf( (char*)&p_expanded_token[0], SPA_PACKET_DATA_SIZE, "%s", p_packet_meta->packet.packet_data );
+    } else if (  0 == strcmp( token_name, "[[UNSAFE_DATA]]" )  ) {
+        snprintf( p_expanded_token, SPA_PACKET_DATA_SIZE,
+            "%s", (p_packet_meta->packet).packet_data );
         p_expanded_token[SPA_PACKET_DATA_SIZE-1] = '\0';
 
     } else {
         // u wot m8
-        __debuglog( packet_log( p_packet_meta->packet_id, "Token name '%s' is not valid.\n", token_name ); )
+        __debuglog(
+            packet_log( p_packet_meta->packet_id,
+                "Token name '%s' is not valid.\n", token_name );
+        )
         free( p_expanded_token );
         return NULL;
     }
 
     p_expanded_token[SPA_PACKET_DATA_SIZE] = '\0';   // force null-term
-    return &p_expanded_token[0];
+    return p_expanded_token;
 }
 
 
@@ -341,13 +385,13 @@ __debuglog(
 
     for ( int i = 0; i < SPA_PACKET_DATA_SIZE; i++ ) {
         for ( int j = 0; j < spa_char_subs.count; j++ ) {
-            if ( p_action_str[i] == spa_char_subs.list[j].before ) {
-                p_action_str[i] = spa_char_subs.list[j].after;
+            if ( p_action_str[i] == (spa_char_subs.list[j]).before ) {
+                p_action_str[i] = (spa_char_subs.list[j]).after;
                 goto __next_subst;   //dont let the loop keep iterating, will cause chain replacements
             }
         }
         __next_subst:
-            continue
+            continue;
     }
 
 # ifdef DEBUG

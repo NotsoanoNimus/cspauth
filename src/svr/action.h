@@ -16,6 +16,10 @@
 #ifndef SPA_ACTION_H
 #define SPA_ACTION_H
 
+#include "../spa.h"
+
+#include <stdint.h>
+
 #define SPA_MAX_ACTIONS 1024
 #define SPA_MAX_OPTS_PER_ACTION 29
 #define SPA_MAX_ACTION_CMD_LEN 254
