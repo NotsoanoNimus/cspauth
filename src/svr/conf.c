@@ -16,6 +16,7 @@
  */
 
 #include "conf.h"
+
 #include "log.h"
 #include "pki.h"
 #include "util.h"
@@ -24,220 +25,109 @@
 
 
 
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+// Utility functions.
+static char* strtrim( char* str ) {
+    char* end;
+
+    while ( isspace(*str) )  str++;
+    if ( *str == 0 )  return str;
+
+    end = str + strlen(str) - 1;
+    while ( end > str && isspace(*end) )  end--;
+
+    end[1] = '\0';
+    return str;
+}
+
+static void strtolower( char* str ) {
+    for ( char* x = str; *x; ++x )
+        *x = tolower( *x );
+}
+
+static int is_bool_option_yes( char* value ) {
+    if ( strnlen(value,3) < 3 )
+        return EXIT_FAILURE;
+
+    char* lowerval = (char*)calloc( 1, 4 );
+    memcpy( lowerval, value, 3 );
+    lowerval[3] = '\0';
+
+    strtolower( lowerval );
+
+    int is_yes = ( strcmp( lowerval, "yes" ) == 0 ) ? EXIT_SUCCESS : EXIT_FAILURE;
+
+    free( lowerval );
+    return is_yes;
+}
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+
+
+
 // TODO: Consider making the spa_conf value opaque.
 // Get the value of a configuration bit/flag.
-int get_config_flag( uint16_t flag ) {
+int SPAConf__get_flag( uint16_t flag ) {
     // this call encourages only one flag be sent through
     return (spa_conf.flags & flag) > 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 // Set the value of a configuration bit on or off.
-int set_config_flag( int on_or_off, uint16_t flag ) {
-    __debuglog( write_log( "******* Setting configuration register flag |0x%04x| to |%s|\n", flag, (on_or_off > 0 ? "on" : "off") ); )
+int SPAConf__set_flag( int on_or_off, uint16_t flag ) {
+    __debuglog(
+        write_log( "******* Setting configuration register flag |0x%04x| to |%s|\n",
+            flag, (on_or_off > 0 ? "on" : "off") );
+    )
+
     if ( on_or_off == ON ) {
         spa_conf.flags |= flag;   //on
     } else {
         spa_conf.flags &= ~flag;   //off
     }
+
     __debuglog( write_log( "******* Config flags: |0x%04x|\n", spa_conf.flags ); )
     return EXIT_SUCCESS;
 }
 
 
 
-// Used to clear the global configuration settings.
-void clear_config() {
+// Used to clear the global configuration settings and loaded data structures.
+void SPAConf__clear() {
     set_config_flag( OFF, SPA_CONF_FLAG_LOAD_SUCCESS );
+
     memset( &spa_conf, 0, sizeof(struct spa_conf_meta_t) );
     memset( &spa_char_subs, 0, sizeof(struct spa_dynamic_substitutions_t) );
-    clear_all_users();
-    clear_all_actions();
+
+    SPAUser__clear();
+    SPAAction__clear();
 }
 
 
 
-// Returns whether or not the configuration registers and globals hold all necessary information for
-//   the service to operate. This is strictly a double-check on the parse_config function.
-// TODO
-int check_config() {
-    if ( (IS_DEBUG_MODE) || spa_conf.log_level >= debug ) {
-        printf( "\n##### Running configuration checks. #####\n" );
-    }
-
-    // terms acceptance
-    if ( get_config_flag( SPA_CONF_FLAG_ACCEPT_TERMS ) != EXIT_SUCCESS ) {
-        write_error_log( "ERROR: You must accept the terms of using this application by setting the"
-            " 'i_agree' variable to 'yes' in the application configuration!\n", NULL );
-    }
-
-    // log_level
-    if ( (IS_DEBUG_MODE) ) {
-        __normallog( write_log( "***** DEBUG option is set. Forcing debug log-level.\n", NULL ); )
-        spa_conf.log_level = debug;
-    } else if ( spa_conf.log_level < quiet ) {
-        __debuglog( write_log( "***** Log level defaulted to 'normal'.\n", NULL ); )
-        spa_conf.log_level = normal;
-    }
-
-    // bind_port
-    if ( spa_conf.bind_port <= 0 ) {
-        __quietlog( write_syslog( LOG_WARNING, "WARNING: Missing bind_port config option."
-            " Defaulting to port %d.\n", SPA_DEFAULT_BIND_PORT ); )
-        spa_conf.bind_port = SPA_DEFAULT_BIND_PORT;
-    }
-
-    // bind_interface
-    if ( strnlen( (const char*)spa_conf.bind_interface, 3 ) == 0 ) {
-        __quietlog( write_syslog( LOG_WARNING, "WARNING: Missing bind_interface config option."
-            " Defaulting to 'any' interface.\n", NULL ); )
-        memcpy( &spa_conf.bind_interface[0], (BYTE*)"any", 4 );
-    }
-
-    // bind_address
-    if ( strnlen( (const char*)spa_conf.bind_address, 3 ) == 0 ) {
-        __quietlog( write_syslog( LOG_WARNING, "WARNING: Missing bind_address config option."
-            " Defaulting to 'any' address.\n", NULL ); )
-        memcpy( &spa_conf.bind_address[0], (BYTE*)"any", 4 );
-    }
-
-    // ip version restrictions
-    if ( (IS_IPV4_ONLY) && (IS_IPV6_ONLY) ) {
-        write_error_log( "Both IPv4- and IPv6-only options are enabled."
-            " Only one of these can be set to 'yes'.\n", NULL );
-    }
-    // check the bind address against the requested version type, if not set to 'any'
-    if ( strncmp( (const char*)&spa_conf.bind_address[0], "any", 4 ) != 0 ) {
-        BYTE* dummyaddr = (BYTE*)malloc( sizeof(struct in6_addr) );
-        memset( dummyaddr, 0, sizeof(struct in6_addr) );
-
-        int is4 = inet_pton( AF_INET, (const char*)&spa_conf.bind_address[0], dummyaddr );
-        memset( dummyaddr, 0, sizeof(struct in6_addr) );
-        int is6 = inet_pton( AF_INET6, (const char*)&spa_conf.bind_address[0], dummyaddr );
-
-        // Check the restriction against the result of the address interpretation.
-        if ( is4 < 1 && (IS_IPV4_ONLY) ) {
-            write_error_log( "IPv4-only mode is set, but the bind_address does not"
-                " appear to be a valid IPv4 address.\n", NULL );
-        } else if ( is6 < 1 && (IS_IPV6_ONLY) ) {
-            write_error_log( "IPv6-only mode is set, but the bind_address does not"
-                " appear to be a valid IPv6 address.\n", NULL );
-        } else {
-            if ( is4 < 1 && is6 < 1 )
-                write_error_log( "The bind_address value '%s' does not appear to be"
-                    " a valid IPv4 or IPv6 address.\n", spa_conf.bind_address );
-        }
-
-        // If the bind address is an IPv4 address, the IPV4_ONLY flag _MUST_ be set for the rest
-        //   of the application to operate properly. IPv6 is the assumed default, so this doesn't
-        //   require separate behavior.
-        if ( is4 == 1 )  set_config_flag( ON, SPA_CONF_FLAG_IPV4_ONLY );
-
-        free( dummyaddr );
-    }
-
-    // mode
-    if ( spa_conf.mode <= 0 ) {
-        write_error_log( "The required 'mode' configuration option is not defined.\n", NULL );
-    }
-
-    // validity_window
-    if ( spa_conf.validity_window <= 0 ) {
-        write_error_log( "The required 'validity_window' configuration option is not defined.\n", NULL );
-    }
-
-    // prevent_replay - WARN when disabled
-    if ( get_config_flag( SPA_CONF_FLAG_PREVENT_REPLAY ) != EXIT_SUCCESS ) {
-        __quietlog( write_syslog( LOG_WARNING, "WARNING: Replay prevention is not actively being"
-            " enforced. This is dangerous and can lead to vulnerabilities!\n", NULL ); )
-    }
-
-    // users
-    if ( get_user_count() <= 0 ) {
-        write_error_log( "The required 'users' configuration option is not defined, or no valid"
-            " users were loaded. The service cannot run.\n", NULL );
-    }
-
-    // skip_invalid_pubkeys
-    if ( get_config_flag( SPA_CONF_FLAG_SKIP_INVALID_PKEY ) == EXIT_SUCCESS ) {
-        __quietlog( write_syslog( LOG_WARNING, "WARNING: The 'skip_invalid_pubkeys' option is enabled."
-            " This can unintentionally lead to configured users failing to load.\n", NULL ); )
-    }
-
-    // action:X
-    if ( get_actions_count() <= 0 && get_config_flag( SPA_CONF_FLAG_GENERIC_ACTION ) != EXIT_SUCCESS ) {
-        write_error_log( "No valid actions have been loaded, and the generic_action handler is not set.\n", NULL );
-    } else if ( get_actions_count() > 0 && get_config_flag( SPA_CONF_FLAG_GENERIC_ACTION ) == EXIT_SUCCESS ) {
-        __quietlog( write_syslog( LOG_WARNING, "WARNING: The 'generic_action' handler is enabled, but some"
-            " valid actions have been loaded which will all redirect to the generic_action handler.\n", NULL ); )
-    }
-
-    // generic_action check
-    if ( get_config_flag( SPA_CONF_FLAG_GENERIC_ACTION ) == EXIT_SUCCESS ) {
-        if ( spa_conf.generic_action.action_id != ON ) {
-            write_error_log( "The 'generic_action' handler is enabled, but the action"
-                " doesn't appear to be valid.\n", NULL );
-        }
-    }
-
-    // pubkey check -- sweep all users and if skip_invalid_pubkeys isn't enabled, throw an error on missing keys
-    for ( LIST_NODE* p_ux = get_user_head(); p_ux != NULL; p_ux = p_ux->next ) {
-        USER* p_user = ((USER*)(p_ux->node));
-
-        __debuglog( printf( "*** Checking pubkey validity for user '%s'.\n", p_user->username ); )
-        int rc = get_user_pkey( p_user );
-        if ( get_config_flag( SPA_CONF_FLAG_SKIP_INVALID_PKEY ) != EXIT_SUCCESS && rc != EXIT_SUCCESS ) {
-            write_error_log( "The public key for user '%s' is not valid and skip_invalid_pubkeys is not enabled."
-                " Either remove the user, enable the option, or fix the public key.\n", p_user->username );
-        }
-        __debuglog( printf( "***** Public key OK\n" ); )
-
-        // Also check: autl -- sweep all users for autl entries, warn on users without any authorized functions
-        __debuglog( printf( "*** Also checking authorizations for this user.\n" ); )
-        if ( list_get_count( p_user->autl ) <= 0 ) {
-            write_syslog( LOG_WARNING, "WARNING: User '%s' does not have any defined authorizations"
-                " and will not be able to perform any SPA functions.\n", p_user->username );
-        } else {
-            __debuglog( printf( "***** User AUTL looks OK.\n" ); )
-        }
-    }
-
-    // map_ipv4_addresses -- Turn off the configuration flag if the socket is not using an 'any' binding
-    if ( get_config_flag( SPA_CONF_FLAG_NO_IPV4_MAPPING ) == EXIT_SUCCESS ) {
-        if ( strncmp( (const char*)&spa_conf.bind_address[0], "any", 4 ) != 0 ) {
-            __debuglog( printf( "***** Socket is bound to a specific address and"
-                " map_ipv4_addresses was disabled. Forcing enabled.\n" ); )
-            set_config_flag( OFF, SPA_CONF_FLAG_NO_IPV4_MAPPING );
-        } else if ( (IS_IPV4_ONLY) || (IS_IPV6_ONLY) ) {
-            __debuglog( printf( "***** Either ipv4_only or ipv6_only is set to 'yes' but"
-                " map_ipv4_addresses was disabled. Forcing enabled.\n" ); )
-            set_config_flag( OFF, SPA_CONF_FLAG_NO_IPV4_MAPPING );
-        }
-    }
-
-
-    __debuglog( printf( "\n# END configuration checks. #\n###########################################\n\n" ); )
-    return EXIT_SUCCESS;
-}
-
-
+// See below.
+static inline int SPAConf__check();
 
 // Primary configuration parsing function. Should only be called one time, unless reloading the service.
-int parse_config( BYTE* conf_path ) {
+int SPAConf__parse( const char* conf_path ) {
     FILE* config_file_h;
 
     write_log( "Loading application configuration from '%s'.\n", conf_path );
 
-    if ( (config_file_h = fopen((const char*)conf_path, "r")) == NULL ) {
+    if (  NULL == (config_file_h = fopen(conf_path, "r"))  ) {
         write_error_log( "~~~ The configuration file could not be read or opened.\n", NULL );
     }
 
     int line_num = 0;
     char linebuf[SPA_CONF_MAX_STRLEN];
+
     const char delim[2] = { '=', '\0' };
     const char keydelim[2] = { ':', '\0' };
+
     while ( !feof(config_file_h) ) {
         line_num++;
         memset( linebuf, 0, SPA_CONF_MAX_STRLEN );
+
         // Read a line from the configuration file.
         fgets( linebuf, SPA_CONF_MAX_STRLEN, config_file_h );
 
@@ -245,11 +135,11 @@ int parse_config( BYTE* conf_path ) {
         if ( linebuf[0] == '#' || linebuf[0] == ';' || strlen( linebuf ) < 3 )  continue;
 
         char* conf_val = strtok( linebuf, delim );   // left side of the '='
-        if ( conf_val == NULL )  continue;
+        if ( NULL == conf_val )  continue;
         char* key = strtrim( conf_val );
 
         conf_val = strtok( NULL, "" ); //delim );   // get the right side of the '='
-        if ( conf_val == NULL )  continue;
+        if ( NULL == conf_val )  continue;
         char* val = conf_val;
 
         // Trim the resulting value.
@@ -421,11 +311,11 @@ int parse_config( BYTE* conf_path ) {
             while ( username != NULL ) {
                 strtolower( username );   // always set username to lower-case
 
-                if ( get_user( (BYTE*)username ) != NULL ) {
+                if ( get_user( username ) != NULL ) {
                     write_error_log( "The user '%s' is already defined.\n", username );
                 }
 
-                USER* p_new_user = create_user( (BYTE*)username );
+                USER* p_new_user = create_user( username );
                 if ( p_new_user == NULL ) {
                     write_error_log( "There was a problem creating the user '%s'.\n", username );
                 }
@@ -454,7 +344,7 @@ int parse_config( BYTE* conf_path ) {
                 goto repeat_loop_cont;
             }
 
-            USER* p_user = get_config_for_user( (BYTE*)keyright );
+            USER* p_user = get_config_for_user( keyright );
             if ( p_user == NULL ) {
                 write_error_log( "Config line #%d: policy user could not be loaded. Is this user defined?", line_num );
             }
@@ -472,7 +362,7 @@ int parse_config( BYTE* conf_path ) {
                 write_error_log( "Config line #%d: The 'users' option must be defined BEFORE any pubkey entries.\n", line_num );
             }
 
-            USER* p_user = get_config_for_user( (BYTE*)keyright );
+            USER* p_user = get_config_for_user( keyright );
             if ( p_user == NULL ) {
                 if ( get_config_flag( SPA_CONF_FLAG_SKIP_INVALID_PKEY ) != EXIT_SUCCESS ) {
                     write_error_log( "Config line %d: pubkey user could not be loaded. Is this user defined?", line_num );
@@ -492,7 +382,7 @@ int parse_config( BYTE* conf_path ) {
                 }
             }
 
-            if ( load_user_pkey( p_user, (BYTE*)val ) != EXIT_SUCCESS ) {
+            if ( load_user_pkey( p_user, val ) != EXIT_SUCCESS ) {
                 if ( get_config_flag( SPA_CONF_FLAG_SKIP_INVALID_PKEY ) != EXIT_SUCCESS ) {
                     write_error_log( "Config line %d: could not load pubkey '%s' for user '%s'.", line_num, val, p_user->username );
                 } else {
@@ -537,7 +427,7 @@ int parse_config( BYTE* conf_path ) {
                 write_error_log( "Config line #%d: Action with ID '%d' is already defined.", line_num, action_id );
             }
 
-            if ( create_action( &action_id, (BYTE*)val ) == NULL ) {
+            if ( create_action( &action_id, val ) == NULL ) {
                 write_error_log( "Config line #%d: Unspecified error creating action with ID '%d'.\n", line_num, action_id );
             }
 
@@ -558,8 +448,8 @@ int parse_config( BYTE* conf_path ) {
 
             __debuglog( write_log( "+++++ Adding new dynamic expansion structure to static list.\n", NULL ); )
             malloc_sizeof( struct spa_packet_data_replacement_t, p_repl );
-            p_repl->before = (BYTE)keyright[0];
-            p_repl->after = (BYTE)val[0];
+            p_repl->before = keyright[0];
+            p_repl->after = val[0];
 
             __debuglog( write_log( "+++++++ Before: '%c', After: '%c'\n", (char)p_repl->before, (char)p_repl->after ); )
             memcpy( &spa_char_subs.list[spa_char_subs.count], p_repl, sizeof(struct spa_packet_data_replacement_t) );
@@ -629,5 +519,169 @@ int parse_config( BYTE* conf_path ) {
 
     set_config_flag( ON, SPA_CONF_FLAG_LOAD_SUCCESS );
     fclose( config_file_h );
-    return check_config();
+    return SPAConf__check();
+}
+
+
+
+// Returns whether or not the configuration registers and globals hold all necessary information for
+//   the service to operate. This is strictly a double-check on the parse_config function.
+static inline int SPAConf__check() {
+    if ( (IS_DEBUG_MODE) || spa_conf.log_level >= debug ) {
+        printf( "\n##### Running configuration checks. #####\n" );
+    }
+
+    // terms acceptance
+    if ( get_config_flag( SPA_CONF_FLAG_ACCEPT_TERMS ) != EXIT_SUCCESS ) {
+        write_error_log( "ERROR: You must accept the terms of using this application by setting the"
+            " 'i_agree' variable to 'yes' in the application configuration!\n", NULL );
+    }
+
+    // log_level
+    if ( (IS_DEBUG_MODE) ) {
+        __normallog( write_log( "***** DEBUG option is set. Forcing debug log-level.\n", NULL ); )
+        spa_conf.log_level = debug;
+    } else if ( spa_conf.log_level < quiet ) {
+        __debuglog( write_log( "***** Log level defaulted to 'normal'.\n", NULL ); )
+        spa_conf.log_level = normal;
+    }
+
+    // bind_port
+    if ( spa_conf.bind_port <= 0 ) {
+        __quietlog( write_syslog( LOG_WARNING, "WARNING: Missing bind_port config option."
+            " Defaulting to port %d.\n", SPA_DEFAULT_BIND_PORT ); )
+        spa_conf.bind_port = SPA_DEFAULT_BIND_PORT;
+    }
+
+    // bind_interface
+    if ( strnlen( (const char*)spa_conf.bind_interface, 3 ) == 0 ) {
+        __quietlog( write_syslog( LOG_WARNING, "WARNING: Missing bind_interface config option."
+            " Defaulting to 'any' interface.\n", NULL ); )
+        memcpy( &spa_conf.bind_interface[0], "any", 4 );
+    }
+
+    // bind_address
+    if ( strnlen( (const char*)spa_conf.bind_address, 3 ) == 0 ) {
+        __quietlog( write_syslog( LOG_WARNING, "WARNING: Missing bind_address config option."
+            " Defaulting to 'any' address.\n", NULL ); )
+        memcpy( &spa_conf.bind_address[0], "any", 4 );
+    }
+
+    // ip version restrictions
+    if ( (IS_IPV4_ONLY) && (IS_IPV6_ONLY) ) {
+        write_error_log( "Both IPv4- and IPv6-only options are enabled."
+            " Only one of these can be set to 'yes'.\n", NULL );
+    }
+    // check the bind address against the requested version type, if not set to 'any'
+    if ( strncmp( (const char*)&spa_conf.bind_address[0], "any", 4 ) != 0 ) {
+        char* dummyaddr = (char*)calloc( 1, sizeof(struct in6_addr) );
+
+        int is4 = inet_pton( AF_INET, (const char*)(&(spa_conf.bind_address[0])), dummyaddr );
+        memset( dummyaddr, 0, sizeof(struct in6_addr) );
+
+        int is6 = inet_pton( AF_INET6, (const char*)(&(spa_conf.bind_address[0])), dummyaddr );
+
+        // Check the restriction against the result of the address interpretation.
+        if ( is4 < 1 && (IS_IPV4_ONLY) ) {
+            write_error_log( "IPv4-only mode is set, but the bind_address does not"
+                " appear to be a valid IPv4 address.\n", NULL );
+        } else if ( is6 < 1 && (IS_IPV6_ONLY) ) {
+            write_error_log( "IPv6-only mode is set, but the bind_address does not"
+                " appear to be a valid IPv6 address.\n", NULL );
+        } else {
+            if ( is4 < 1 && is6 < 1 )
+                write_error_log( "The bind_address value '%s' does not appear to be"
+                    " a valid IPv4 or IPv6 address.\n", spa_conf.bind_address );
+        }
+
+        // If the bind address is an IPv4 address, the IPV4_ONLY flag _MUST_ be set for the rest
+        //   of the application to operate properly. IPv6 is the assumed default, so this doesn't
+        //   require separate behavior.
+        if ( is4 == 1 )  set_config_flag( ON, SPA_CONF_FLAG_IPV4_ONLY );
+
+        free( dummyaddr );
+    }
+
+    // mode
+    if ( spa_conf.mode <= 0 ) {
+        write_error_log( "The required 'mode' configuration option is not defined.\n", NULL );
+    }
+
+    // validity_window
+    if ( spa_conf.validity_window <= 0 ) {
+        write_error_log( "The required 'validity_window' configuration option is not defined.\n", NULL );
+    }
+
+    // prevent_replay - WARN when disabled
+    if ( get_config_flag( SPA_CONF_FLAG_PREVENT_REPLAY ) != EXIT_SUCCESS ) {
+        __quietlog( write_syslog( LOG_WARNING, "WARNING: Replay prevention is not actively being"
+            " enforced. This is dangerous and can lead to vulnerabilities!\n", NULL ); )
+    }
+
+    // users
+    if ( get_user_count() <= 0 ) {
+        write_error_log( "The required 'users' configuration option is not defined, or no valid"
+            " users were loaded. The service cannot run.\n", NULL );
+    }
+
+    // skip_invalid_pubkeys
+    if ( get_config_flag( SPA_CONF_FLAG_SKIP_INVALID_PKEY ) == EXIT_SUCCESS ) {
+        __quietlog( write_syslog( LOG_WARNING, "WARNING: The 'skip_invalid_pubkeys' option is enabled."
+            " This can unintentionally lead to configured users failing to load.\n", NULL ); )
+    }
+
+    // action:X
+    if ( get_actions_count() <= 0 && get_config_flag( SPA_CONF_FLAG_GENERIC_ACTION ) != EXIT_SUCCESS ) {
+        write_error_log( "No valid actions have been loaded, and the generic_action handler is not set.\n", NULL );
+    } else if ( get_actions_count() > 0 && get_config_flag( SPA_CONF_FLAG_GENERIC_ACTION ) == EXIT_SUCCESS ) {
+        __quietlog( write_syslog( LOG_WARNING, "WARNING: The 'generic_action' handler is enabled, but some"
+            " valid actions have been loaded which will all redirect to the generic_action handler.\n", NULL ); )
+    }
+
+    // generic_action check
+    if ( get_config_flag( SPA_CONF_FLAG_GENERIC_ACTION ) == EXIT_SUCCESS ) {
+        if ( spa_conf.generic_action.action_id != ON ) {
+            write_error_log( "The 'generic_action' handler is enabled, but the action"
+                " doesn't appear to be valid.\n", NULL );
+        }
+    }
+
+    // pubkey check -- sweep all users and if skip_invalid_pubkeys isn't enabled, throw an error on missing keys
+    for ( LIST_NODE* p_ux = get_user_head(); p_ux != NULL; p_ux = p_ux->next ) {
+        USER* p_user = ((USER*)(p_ux->node));
+
+        __debuglog( printf( "*** Checking pubkey validity for user '%s'.\n", p_user->username ); )
+        int rc = get_user_pkey( p_user );
+        if ( get_config_flag( SPA_CONF_FLAG_SKIP_INVALID_PKEY ) != EXIT_SUCCESS && rc != EXIT_SUCCESS ) {
+            write_error_log( "The public key for user '%s' is not valid and skip_invalid_pubkeys is not enabled."
+                " Either remove the user, enable the option, or fix the public key.\n", p_user->username );
+        }
+        __debuglog( printf( "***** Public key OK\n" ); )
+
+        // Also check: autl -- sweep all users for autl entries, warn on users without any authorized functions
+        __debuglog( printf( "*** Also checking authorizations for this user.\n" ); )
+        if ( list_get_count( p_user->autl ) <= 0 ) {
+            write_syslog( LOG_WARNING, "WARNING: User '%s' does not have any defined authorizations"
+                " and will not be able to perform any SPA functions.\n", p_user->username );
+        } else {
+            __debuglog( printf( "***** User AUTL looks OK.\n" ); )
+        }
+    }
+
+    // map_ipv4_addresses -- Turn off the configuration flag if the socket is not using an 'any' binding
+    if ( get_config_flag( SPA_CONF_FLAG_NO_IPV4_MAPPING ) == EXIT_SUCCESS ) {
+        if ( strncmp( (const char*)&spa_conf.bind_address[0], "any", 4 ) != 0 ) {
+            __debuglog( printf( "***** Socket is bound to a specific address and"
+                " map_ipv4_addresses was disabled. Forcing enabled.\n" ); )
+            set_config_flag( OFF, SPA_CONF_FLAG_NO_IPV4_MAPPING );
+        } else if ( (IS_IPV4_ONLY) || (IS_IPV6_ONLY) ) {
+            __debuglog( printf( "***** Either ipv4_only or ipv6_only is set to 'yes' but"
+                " map_ipv4_addresses was disabled. Forcing enabled.\n" ); )
+            set_config_flag( OFF, SPA_CONF_FLAG_NO_IPV4_MAPPING );
+        }
+    }
+
+
+    __debuglog( printf( "\n# END configuration checks. #\n###########################################\n\n" ); )
+    return EXIT_SUCCESS;
 }

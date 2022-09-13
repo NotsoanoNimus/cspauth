@@ -104,11 +104,11 @@ struct spa_conf_meta_t {
 
 
 
+// Functions for accessing and manipulating the loaded SPA configuration.
 int SPAConf__get_flag( uint16_t flag );
 int SPAConf__set_flag( int on_or_off, uint16_t flag );
 void SPAConf__clear();
-int SPAConf__parse( char* conf_path );
-int SPAConf__check();
+int SPAConf__parse( const char* conf_path );
 
 
 

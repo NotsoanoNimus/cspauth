@@ -23,6 +23,13 @@
 
 
 
+static void strtolower( char* str ) {
+    for ( char* x = str; *x; ++x )
+        *x = tolower( *x );
+}
+
+
+
 // Uses a static users list that gets manually cleared every time the service receives restart signals.
 LIST* users_list = NULL;
 
