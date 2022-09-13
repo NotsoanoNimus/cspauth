@@ -53,55 +53,55 @@
 
 // Shorthanding for brevity.
 #define IS_CONFIG_LOADED \
-	get_config_flag( SPA_CONF_FLAG_LOAD_SUCCESS ) == EXIT_SUCCESS
+    get_config_flag( SPA_CONF_FLAG_LOAD_SUCCESS ) == EXIT_SUCCESS
 #define IS_IPV4_ONLY \
-	get_config_flag( SPA_CONF_FLAG_IPV4_ONLY ) == EXIT_SUCCESS
+    get_config_flag( SPA_CONF_FLAG_IPV4_ONLY ) == EXIT_SUCCESS
 #define IS_IPV6_ONLY \
-	get_config_flag( SPA_CONF_FLAG_IPV6_ONLY ) == EXIT_SUCCESS
+    get_config_flag( SPA_CONF_FLAG_IPV6_ONLY ) == EXIT_SUCCESS
 #define IS_DEBUG_MODE \
-	spa_process.debug_mode == ON
+    spa_process.debug_mode == ON
 #define IS_DAEMONIZED \
-	spa_process.daemonized == ON
+    spa_process.daemonized == ON
 
 
 
 // The available SPA operating modes defined in the configuration file.
 typedef enum spa_mode {
-	dead = 1,
-	stealthy,
-	helpful,
-	noisy
+    dead = 1,
+    stealthy,
+    helpful,
+    noisy
 } MODE;
 
 // Application log levels. Defined in an enum so more granularity can be dynamically added later as needed.
 typedef enum spa_log_level {
-	quiet = 1,
-	normal,
-	verbose,
-	debug
+    quiet = 1,
+    normal,
+    verbose,
+    debug
 } LOGLEVEL;
 
 
 // Retains meta-info about the configuration and process in a global structure.
 struct spa_process_meta_t {
-	BYTE config_path[PATH_MAX];
-	BYTE pidfile_path[PATH_MAX];
-	BYTE syslog_tag[SPA_CONF_SYSLOG_TAG_MAX_STRLEN+1];
-	uint8_t debug_mode;
-	uint8_t daemonized;
+    BYTE config_path[PATH_MAX];
+    BYTE pidfile_path[PATH_MAX];
+    BYTE syslog_tag[SPA_CONF_SYSLOG_TAG_MAX_STRLEN+1];
+    uint8_t debug_mode;
+    uint8_t daemonized;
 } __attribute__((__packed__)) spa_process;
 
 // Retains meta-info about the application's configuration in a global structure.
 //   These parameters are cleared and refreshed from the process information above every time the service re/starts.
 struct spa_conf_meta_t {
-	MODE mode;
-	uint16_t flags;
-	uint16_t bind_port;
-	uint32_t validity_window;
-	LOGLEVEL log_level;
-	ACTION generic_action;
-	BYTE bind_interface[IF_NAMESIZE];
-	BYTE bind_address[INET6_ADDRSTRLEN];
+    MODE mode;
+    uint16_t flags;
+    uint16_t bind_port;
+    uint32_t validity_window;
+    LOGLEVEL log_level;
+    ACTION generic_action;
+    BYTE bind_interface[IF_NAMESIZE];
+    BYTE bind_address[INET6_ADDRSTRLEN];
 } __attribute__((__packed__)) spa_conf;
 
 

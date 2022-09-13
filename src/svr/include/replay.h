@@ -31,9 +31,9 @@
 
 
 typedef struct spa_replay_record_t {
-	BYTE hash[SPA_PACKET_HASH_SIZE];
-	uint64_t time;
-//	struct spa_replay_record_t* next;
+    BYTE hash[SPA_PACKET_HASH_SIZE];
+    uint64_t time;
+//    struct spa_replay_record_t* next;
 } __attribute__((__packed__)) REPLAY_RECORD;
 
 

@@ -27,37 +27,37 @@
 
 #define MAX_SINGLE_AUTL_STRLEN 64
 #define MAX_USERS 128
-#define MAX_USER_AUTH_LISTS MAX_ACTIONS
+#define MAX_USER_AUTH_LISTS SPA_MAX_ACTIONS
 
 
 // Authorization lists should be processed when the daemon starts, _before_ the socket starts to listen for SPAs.
 typedef struct spa_user_autl_opt_range_t {
-	uint16_t low_bound;
-	uint16_t high_bound;
+    uint16_t low_bound;
+    uint16_t high_bound;
 } __attribute__((__packed__)) OPTRANGE;
 
 typedef struct spa_user_autl_t {
-	uint16_t action_id;
-	uint8_t any_action;
-	uint8_t opt_range_count;
-	OPTRANGE allowed_options[MAX_ALLOWABLE_OPTS_PER_ACTION];
+    uint16_t action_id;
+    uint8_t any_action;
+    uint8_t opt_range_count;
+    OPTRANGE allowed_options[SPA_MAX_OPTS_PER_ACTION];
 } __attribute__((__packed__)) AUTL;
 
 
 // Username to RSA publickey associations.
 typedef struct spa_user_pkey_t {
-	BYTE key_path[PATH_MAX];
-	EVP_PKEY* evp_pkey;
+    BYTE key_path[PATH_MAX];
+    EVP_PKEY* evp_pkey;
 } __attribute__((__packed__)) USERPKI;
 
 
 // Meta-structure containing data for users.
 typedef struct spa_user_data_t {
-	BYTE username[SPA_PACKET_USERNAME_SIZE];
-	USERPKI pkey;
-	AUTL* autl_head;
-	LIST* autl;
-	uint8_t valid_user;
+    BYTE username[SPA_PACKET_USERNAME_SIZE];
+    USERPKI pkey;
+    AUTL* autl_head;
+    LIST* autl;
+    uint8_t valid_user;
 } __attribute__((__packed__)) USER;
 
 

@@ -94,12 +94,12 @@ typedef unsigned char BYTE;
 
 // The structure of a response packet.
 typedef struct _spa_response_packet_t {
-	uint32_t server_version;
-	uint16_t response_code;
-	uint16_t reserved;
-	uint64_t timestamp;
-	uint64_t packet_id;
-	BYTE response_data[SPA_RESPONSE_STRLEN];
+    uint32_t server_version;
+    uint16_t response_code;
+    uint16_t reserved;
+    uint64_t timestamp;
+    uint64_t packet_id;
+    BYTE response_data[SPA_RESPONSE_STRLEN];
 } spa_response_packet_t;
 
 
@@ -111,17 +111,17 @@ typedef struct _spa_packet_t {
     uint64_t client_timestamp;
     uint16_t request_action;
     uint16_t request_option;
-	uint32_t __reserved;   //trying to keep nice boundaries
+    uint32_t __reserved;   //trying to keep nice boundaries
     BYTE packet_hash[SPA_PACKET_HASH_SIZE];
-	uint32_t signature_length;
-	BYTE packet_signature[SPA_PACKET_MAX_SIGNATURE_SIZE];
+    uint32_t signature_length;
+    BYTE packet_signature[SPA_PACKET_MAX_SIGNATURE_SIZE];
 } spa_packet_t; //__attribute__((__packed__));
 
 // Wrapper struct for meta-data about an incoming SPA packet.
 typedef struct spa_packet_meta_t {
     struct sockaddr_in6 clientaddr;
     spa_packet_t packet;
-	uint64_t packet_id;
+    uint64_t packet_id;
 } spa_packet_meta_t;
 
 

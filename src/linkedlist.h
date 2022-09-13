@@ -32,18 +32,18 @@
 #define MAX_LIST_NODES 1000000
 
 #define GET_FROM_LIST_AS( list, type, name, propertyoffset, wherevalue, valuesize ) \
-	type* name = (type*)((list_get_node(list, propertyoffset, wherevalue, valuesize))->node);
+    type* name = (type*)((list_get_node(list, propertyoffset, wherevalue, valuesize))->node);
 
 
 
 typedef struct spa_linked_list_node_t {
-	void* node;
-	struct spa_linked_list_node_t* next;
+    void* node;
+    struct spa_linked_list_node_t* next;
 } __attribute__((__packed__)) LIST_NODE;
 
 typedef struct spa_linked_list_t {
-	LIST_NODE* head;
-	uint32_t max_size;
+    LIST_NODE* head;
+    uint32_t max_size;
 } __attribute__((__packed__)) LIST;
 
 
