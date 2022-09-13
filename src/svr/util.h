@@ -13,8 +13,8 @@
  */
 
 
-#ifndef HEADER_UTIL_H
-#define HEADER_UTIL_H
+#ifndef SPA_UTIL_H
+#define SPA_UTIL_H
 
 
 
@@ -24,13 +24,10 @@
 
 
 
-// Redefined; no sense in importing spa.h just for this.
-typedef unsigned char BYTE;
-
 char* strtrim( char* str );
 void strtolower( char* str );
 int is_bool_option_yes( char* value );
 
 
 
-#endif
+#endif   /* SPA_UTIL_H */

@@ -13,8 +13,8 @@
  */
 
 
-#ifndef HEADER_LOG_H
-#define HEADER_LOG_H
+#ifndef SPA_LOG_H
+#define SPA_LOG_H
 
 
 
@@ -23,7 +23,7 @@
 #include <syslog.h>
 #include <linux/limits.h>
 
-#include "../../spa.h"
+#include "../spa.h"
 #include "conf.h"
 
 
@@ -87,4 +87,4 @@ void print_hex( BYTE* data, size_t len );
 
 
 
-#endif
+#endif   /* SPA_LOG_H */

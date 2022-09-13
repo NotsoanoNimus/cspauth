@@ -13,8 +13,8 @@
  */
 
 
-#ifndef PKI_HEADER_H
-#define PKI_HEADER_H
+#ifndef SPA_PKI_H
+#define SPA_PKI_H
 
 
 
@@ -26,7 +26,7 @@
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 
-#include "../../spa.h"
+#include "../spa.h"
 #include "users.h"
 
 
@@ -38,4 +38,4 @@ int get_user_pkey( USER* p_user_data );
 
 
 
-#endif
+#endif   /* SPA_PKI_H */

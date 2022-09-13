@@ -13,8 +13,8 @@
  */
 
 
-#ifndef HEADER_CONF_H
-#define HEADER_CONF_H
+#ifndef SPA_CONF_H
+#define SPA_CONF_H
 
 
 
@@ -29,21 +29,21 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 
-#include "../../spa.h"
+#include "../spa.h"
 #include "action.h"
 
 
 
-#define BASE_SHIFT 0x0001
-#define SPA_CONF_FLAG_LOAD_SUCCESS ( BASE_SHIFT << 1 )
-#define SPA_CONF_FLAG_ACCEPT_TERMS ( BASE_SHIFT << 2 )
-#define SPA_CONF_FLAG_IPV4_ONLY ( BASE_SHIFT << 3 )
-#define SPA_CONF_FLAG_IPV6_ONLY ( BASE_SHIFT << 4 )
-#define SPA_CONF_FLAG_SKIP_INVALID_PKEY ( BASE_SHIFT << 5 )
-#define SPA_CONF_FLAG_PREVENT_REPLAY ( BASE_SHIFT << 6 )
-#define SPA_CONF_FLAG_GENERIC_ACTION ( BASE_SHIFT << 7 )
-#define SPA_CONF_FLAG_NO_IPV4_MAPPING ( BASE_SHIFT << 8 )
-#define SPA_CONF_FLAG_LOG_EXIT_CODES ( BASE_SHIFT << 9 )
+// Global daemon configuration flags.
+#define SPA_CONF_FLAG_LOAD_SUCCESS      ( 1 << 1 )
+#define SPA_CONF_FLAG_ACCEPT_TERMS      ( 1 << 2 )
+#define SPA_CONF_FLAG_IPV4_ONLY         ( 1 << 3 )
+#define SPA_CONF_FLAG_IPV6_ONLY         ( 1 << 4 )
+#define SPA_CONF_FLAG_SKIP_INVALID_PKEY ( 1 << 5 )
+#define SPA_CONF_FLAG_PREVENT_REPLAY    ( 1 << 6 )
+#define SPA_CONF_FLAG_GENERIC_ACTION    ( 1 << 7 )
+#define SPA_CONF_FLAG_NO_IPV4_MAPPING   ( 1 << 8 )
+#define SPA_CONF_FLAG_LOG_EXIT_CODES    ( 1 << 9 )
 
 #define SPA_CONF_MAX_STRLEN 512
 #define SPA_CONF_SYSLOG_TAG_MAX_STRLEN 16
@@ -84,12 +84,12 @@ typedef enum spa_log_level {
 
 // Retains meta-info about the configuration and process in a global structure.
 struct spa_process_meta_t {
-    BYTE config_path[PATH_MAX];
-    BYTE pidfile_path[PATH_MAX];
-    BYTE syslog_tag[SPA_CONF_SYSLOG_TAG_MAX_STRLEN+1];
+    char config_path[PATH_MAX];
+    char pidfile_path[PATH_MAX];
+    char syslog_tag[SPA_CONF_SYSLOG_TAG_MAX_STRLEN+1];
     uint8_t debug_mode;
     uint8_t daemonized;
-} __attribute__((__packed__)) spa_process;
+} spa_process;
 
 // Retains meta-info about the application's configuration in a global structure.
 //   These parameters are cleared and refreshed from the process information above every time the service re/starts.
@@ -99,19 +99,19 @@ struct spa_conf_meta_t {
     uint16_t bind_port;
     uint32_t validity_window;
     LOGLEVEL log_level;
-    ACTION generic_action;
-    BYTE bind_interface[IF_NAMESIZE];
-    BYTE bind_address[INET6_ADDRSTRLEN];
-} __attribute__((__packed__)) spa_conf;
+    spa_action_t generic_action;
+    char bind_interface[IF_NAMESIZE];
+    char bind_address[INET6_ADDRSTRLEN];
+} spa_conf;
 
 
 
-int get_config_flag( uint16_t flag );
-int set_config_flag( int on_or_off, uint16_t flag );
-void clear_config();
-int parse_config( BYTE* conf_path );
-int check_config();
+int SPAConf__get_flag( uint16_t flag );
+int SPAConf__set_flag( int on_or_off, uint16_t flag );
+void SPAConf__clear();
+int SPAConf__parse( char* conf_path );
+int SPAConf__check();
 
 
 
-#endif
+#endif   /* SPA_CONF_H */

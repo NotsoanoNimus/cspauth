@@ -13,12 +13,12 @@
  */
 
 
-#ifndef HEADER_VERIFY_H
-#define HEADER_VERIFY_H
+#ifndef SPA_VERIFY_H
+#define SPA_VERIFY_H
 
 
 
-#include "../../spa.h"
+#include "../spa.h"
 #include "users.h"
 #include "action.h"
 
@@ -52,4 +52,4 @@ int verify_signature( uint64_t* packet_id, struct spa_packet_t* p_spa_packet, US
 
 
 
-#endif
+#endif   /* SPA_VERIFY_H */

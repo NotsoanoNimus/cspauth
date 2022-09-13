@@ -13,14 +13,14 @@
  */
 
 
-#ifndef USERS_HEADER_H
-#define USERS_HEADER_H
+#ifndef SPA_USERS_H
+#define SPA_USERS_H
 
 
 
 #include <string.h>
 
-#include "../../spa.h"
+#include "../spa.h"
 #include "action.h"
 
 
@@ -83,4 +83,4 @@ int is_user_authorized( USER* p_user_data, uint16_t* action_id, uint16_t* option
 
 
 
-#endif
+#endif   /* SPA_USERS_H */

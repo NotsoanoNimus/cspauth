@@ -13,15 +13,15 @@
  */
 
 
-#ifndef HEADER_REPLAY_H
-#define HEADER_REPLAY_H
+#ifndef SPA_REPLAY_H
+#define SPA_REPLAY_H
 
 
 
 #include <unistd.h>
 #include <pthread.h>
 
-#include "../../spa.h"
+#include "../spa.h"
 
 
 
@@ -47,4 +47,4 @@ int check_for_replay( BYTE* hash );
 
 
 
-#endif
+#endif   /* SPA_REPLAY_H */
