@@ -16,34 +16,25 @@
 #ifndef SPA_REPLAY_H
 #define SPA_REPLAY_H
 
-
-
-#include <unistd.h>
-#include <pthread.h>
-
-#include "../spa.h"
-
-
-
 // Maximum amount of replay recording hashes that can be stored in memory.
-#define MAX_REPLAY_OBJECTS 8192
+#define SPA_MAX_REPLAY_OBJECTS 8192
 
 
 
+// Holds a packet hash and a timestamp.
 typedef struct spa_replay_record_t {
-    BYTE hash[SPA_PACKET_HASH_SIZE];
+    char hash[SPA_PACKET_HASH_SIZE];
     uint64_t time;
-//    struct spa_replay_record_t* next;
-} __attribute__((__packed__)) REPLAY_RECORD;
+} spa_replay_t;
 
 
 
 // Monitor to prevent replays.
-int prevent_replay_init();
+int SPAReplay__init();
 // Record a SHA256 hash into the linked list.
-void create_replay_record( BYTE* hash, uint64_t* time );
+void SPAReplay__add( char* hash, uint64_t* time );
 // Check the hash against all valid records after a cleanup.
-int check_for_replay( BYTE* hash );
+int SPAReplay__check( char* hash );
 
 
 

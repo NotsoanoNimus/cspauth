@@ -16,8 +16,6 @@
 #ifndef SPA_LOG_H
 #define SPA_LOG_H
 
-
-
 #include <errno.h>
 #include <stdarg.h>
 #include <syslog.h>
@@ -79,10 +77,16 @@ typedef enum spa_log_type_t {
 
 void syslog_init();
 uint64_t generate_packet_id();
-void __write_log( uint64_t packet_id, LOG_TYPE log_type, int log_priority, const char* format, ... );
+void __write_log(
+    uint64_t packet_id,
+    LOG_TYPE log_type,
+    int log_priority,
+    const char* format,
+    ...
+);
 
 # ifdef DEBUG
-void print_hex( BYTE* data, size_t len );
+void print_hex( char* data, size_t len );
 # endif
 
 

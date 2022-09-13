@@ -16,8 +16,6 @@
 #ifndef SPA_CONF_H
 #define SPA_CONF_H
 
-
-
 #include <err.h>
 #include <ctype.h>
 #include <stdio.h>

@@ -17,8 +17,13 @@
 
 
 #include "replay.h"
+
+#include "../spa.h"
 #include "log.h"
 #include "conf.h"
+
+#include <unistd.h>
+#include <pthread.h>
 
 
 

@@ -15,9 +15,18 @@
  *
  */
 
-
 #include "pki.h"
+
+#include "../spa.h"
 #include "log.h"
+
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+#include <openssl/x509.h>
+#include <openssl/err.h>
+#include <openssl/pem.h>
+#include <openssl/rsa.h>
 
 
 

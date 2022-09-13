@@ -16,8 +16,6 @@
 #ifndef SPA_VERIFY_H
 #define SPA_VERIFY_H
 
-
-
 #include "../spa.h"
 #include "users.h"
 #include "action.h"
@@ -41,14 +39,14 @@
  *
  */
 
-int pre_packet_verify( BYTE* input_buffer );
+int pre_packet_verify( char* input_buffer );
 int verify_timestamp( uint64_t* packet_id, uint64_t* timestamp );
-int verify_username( uint64_t* packet_id, BYTE* username );
+int verify_username( uint64_t* packet_id, char* username );
 int verify_packet_hash( uint64_t* packet_id, struct spa_packet_t* p_spa_packet );
-int verify_action( uint64_t* packet_id, ACTION* p_spa_action, uint16_t* p_action );
-int verify_authorization( uint64_t* packet_id, USER* p_user_data, uint16_t* p_action, uint16_t* p_option );
-int verify_pubkey( uint64_t* packet_id, USER* p_user_data );
-int verify_signature( uint64_t* packet_id, struct spa_packet_t* p_spa_packet, USER* p_user_data );
+int verify_action( uint64_t* packet_id, spa_action_t* p_spa_action, uint16_t* p_action );
+int verify_authorization( uint64_t* packet_id, spa_user_t* p_user_data, uint16_t* p_action, uint16_t* p_option );
+int verify_pubkey( uint64_t* packet_id, spa_user_t* p_user_data );
+int verify_signature( uint64_t* packet_id, struct spa_packet_t* p_spa_packet, spa_user_t* p_user_data );
 
 
 

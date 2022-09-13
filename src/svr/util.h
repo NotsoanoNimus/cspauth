@@ -16,8 +16,6 @@
 #ifndef SPA_UTIL_H
 #define SPA_UTIL_H
 
-
-
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>

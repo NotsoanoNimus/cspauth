@@ -16,25 +16,14 @@
 #ifndef SPA_PKI_H
 #define SPA_PKI_H
 
-
-
-#include <stddef.h>
-#include <stdlib.h>
-#include <string.h>
-#include <openssl/x509.h>
-#include <openssl/err.h>
-#include <openssl/pem.h>
-#include <openssl/rsa.h>
-
-#include "../spa.h"
 #include "users.h"
 
 
 
 // Load an X509 public key from a filename.
-int load_user_pkey( USER* p_user_data, BYTE* p_pem_filename );
+int load_user_pkey( spa_user_t* p_user_data, char* p_pem_filename );
 // Get the validity of a pkey without saving/changing anything.
-int get_user_pkey( USER* p_user_data );
+int get_user_pkey( spa_user_t* p_user_data );
 
 
 
