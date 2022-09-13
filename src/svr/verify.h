@@ -39,14 +39,14 @@
  *
  */
 
-int pre_packet_verify( char* input_buffer );
-int verify_timestamp( uint64_t* packet_id, uint64_t* timestamp );
-int verify_username( uint64_t* packet_id, char* username );
-int verify_packet_hash( uint64_t* packet_id, struct spa_packet_t* p_spa_packet );
-int verify_action( uint64_t* packet_id, spa_action_t* p_spa_action, uint16_t* p_action );
-int verify_authorization( uint64_t* packet_id, spa_user_t* p_user_data, uint16_t* p_action, uint16_t* p_option );
-int verify_pubkey( uint64_t* packet_id, spa_user_t* p_user_data );
-int verify_signature( uint64_t* packet_id, struct spa_packet_t* p_spa_packet, spa_user_t* p_user_data );
+int pre_packet_verify( char* p_input_buffer );
+int verify_timestamp( uint64_t packet_id, uint64_t timestamp );
+int verify_username( uint64_t packet_id, char* p_username );
+int verify_packet_hash( uint64_t packet_id, spa_packet_t* p_spa_packet );
+int verify_action( uint64_t packet_id, spa_action_t* p_spa_action, uint16_t action );
+int verify_authorization( uint64_t packet_id, spa_user_t* p_user_data, uint16_t action, uint16_t option );
+int verify_pubkey( uint64_t packet_id, spa_user_t* p_user_data );
+int verify_signature( uint64_t packet_id, spa_packet_t* p_spa_packet, spa_user_t* p_user_data );
 
 
 

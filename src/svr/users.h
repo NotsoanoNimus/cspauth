@@ -55,6 +55,7 @@ typedef struct spa_user_data_t {
     spa_user_key_t pkey;
     spa_autl_t* autl_head;
     List_t* autl;
+    uint16_t autl_count;
     uint8_t valid_user;
 } spa_user_t;
 

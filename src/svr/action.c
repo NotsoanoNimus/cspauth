@@ -50,7 +50,7 @@ void SPAAction__clear() {
 
 // Get an action from the linked list using the unique action ID.
 spa_action_t* SPAAction__get( uint16_t action ) {
-    if (  EXIT_SUCCESS == get_config_flag( SPA_CONF_FLAG_GENERIC_ACTION )  ) {
+    if (  EXIT_SUCCESS == SPAConf__get_flag( SPA_CONF_FLAG_GENERIC_ACTION )  ) {
         __debuglog(  write_log( "+++ Skipping action ID check: generic_action is set.\n", NULL );  )
         return &(spa_conf.generic_action);
     } else if ( 0 == actions_count )  return NULL;
@@ -68,7 +68,7 @@ spa_action_t* SPAAction__get( uint16_t action ) {
 
 // Create a new action and push it onto the actions list.
 spa_action_t* SPAAction__add( uint16_t action, const char* command ) {
-    if (  EXIT_SUCCESS == get_config_flag( SPA_CONF_FLAG_GENERIC_ACTION )  ) {
+    if (  EXIT_SUCCESS == SPAConf__get_flag( SPA_CONF_FLAG_GENERIC_ACTION )  ) {
         write_syslog( LOG_WARNING, "WARNING: Ignoring action with ID %d because"
             " the generic_action option is set.\n", action );
         return NULL;
@@ -224,7 +224,7 @@ __debuglog( packet_log( p_packet_meta->packet_id, " `---> Action found token '%s
         "Performing expanded action string: <<<|%s|>>>\n", p_exp_action ); )
 
     int rc = system( (const char*)p_exp_action );
-    if ( get_config_flag( SPA_CONF_FLAG_LOG_EXIT_CODES ) == EXIT_SUCCESS ) {
+    if ( SPAConf__get_flag( SPA_CONF_FLAG_LOG_EXIT_CODES ) == EXIT_SUCCESS ) {
         packet_syslog(
             p_packet_meta->packet_id,
             ( rc == 0 ) ? LOG_NOTICE : LOG_WARNING,
@@ -270,7 +270,7 @@ static inline char* spa_action_get_token_value(
         char client_addr[INET6_ADDRSTRLEN];
         memset( &client_addr[0], 0, INET6_ADDRSTRLEN );
         if ( *listen_family == AF_INET ||  (
-                (get_config_flag( SPA_CONF_FLAG_NO_IPV4_MAPPING ) == EXIT_SUCCESS) &&
+                (SPAConf__get_flag( SPA_CONF_FLAG_NO_IPV4_MAPPING ) == EXIT_SUCCESS) &&
                 (IN6_IS_ADDR_V4MAPPED(&(p_packet_meta->clientaddr.sin6_addr)))
         )  ) {
             __debuglog( packet_log( p_packet_meta->packet_id, "*** Shrinking clientaddr to IPv4 sockaddr.\n", NULL ); )

@@ -16,17 +16,6 @@
 #ifndef SPA_CONF_H
 #define SPA_CONF_H
 
-#include <err.h>
-#include <ctype.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <linux/limits.h>
-#include <openssl/x509.h>
-#include <net/if.h>
-#include <arpa/inet.h>
-
 #include "../spa.h"
 #include "action.h"
 
@@ -51,15 +40,15 @@
 
 // Shorthanding for brevity.
 #define IS_CONFIG_LOADED \
-    get_config_flag( SPA_CONF_FLAG_LOAD_SUCCESS ) == EXIT_SUCCESS
+    EXIT_SUCCESS == SPAConf__get_flag( SPA_CONF_FLAG_LOAD_SUCCESS )
 #define IS_IPV4_ONLY \
-    get_config_flag( SPA_CONF_FLAG_IPV4_ONLY ) == EXIT_SUCCESS
+    EXIT_SUCCESS == SPAConf__get_flag( SPA_CONF_FLAG_IPV4_ONLY )
 #define IS_IPV6_ONLY \
-    get_config_flag( SPA_CONF_FLAG_IPV6_ONLY ) == EXIT_SUCCESS
+    EXIT_SUCCESS == SPAConf__get_flag( SPA_CONF_FLAG_IPV6_ONLY )
 #define IS_DEBUG_MODE \
-    spa_process.debug_mode == ON
+    ON == spa_process.debug_mode
 #define IS_DAEMONIZED \
-    spa_process.daemonized == ON
+    ON == spa_process.daemonized
 
 
 

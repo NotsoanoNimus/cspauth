@@ -44,16 +44,18 @@
 
 
 
-BYTE* default_conf_file = (BYTE*)"/etc/cspauthd.conf";
-int mainsockfd = -1;
-sa_family_t listen_family = -1;
+// Global variables.
+static char* p_default_conf = "/etc/cspauthd.conf";
+static int mainsockfd = -1;
+static sa_family_t listen_family = -1;
 
 
 
+// Functions to define later.
 uint64_t generate_packet_id();
 void* handle_packet( void* packet );
 int send_response( uint64_t* packet_id, struct sockaddr_in6* p_clientaddr,
-    uint16_t response_code, BYTE* response_msg );
+    uint16_t response_code, char* response_msg );
 void spawn_socket();
 void register_signals();
 void handle_signal( int signal );
@@ -75,7 +77,7 @@ int main( int argc, char **argv ) {
     // Other initializations.
     openssl_init();
 
-    BYTE* syslog_tag = (BYTE*)"cspauthd";
+    char* syslog_tag = (char*)"cspauthd";
     memcpy( &spa_process.syslog_tag[0], syslog_tag,
         strnlen((const char*)syslog_tag,SPA_CONF_SYSLOG_TAG_MAX_STRLEN) );
     syslog_init();
@@ -105,10 +107,10 @@ int main( int argc, char **argv ) {
     };
     int cli_option_index = 0;
     int cli_opt;
-    BYTE conf_file_c[PATH_MAX];
-    BYTE* conf_file = &conf_file_c[0];
-    BYTE pid_file_c[PATH_MAX];
-    BYTE* pid_file = &pid_file_c[0];
+    char conf_file_c[PATH_MAX];
+    char* conf_file = &conf_file_c[0];
+    char pid_file_c[PATH_MAX];
+    char* pid_file = &pid_file_c[0];
     memset( conf_file_c, 0, PATH_MAX );
     memset( pid_file_c, 0, PATH_MAX );
 
@@ -130,12 +132,12 @@ int main( int argc, char **argv ) {
                 break;
             case 'p':
                 // The PID file will be disregarded if the application is not daemonized.
-                if ( (pid_file = (BYTE*)strndup(optarg,PATH_MAX)) == NULL )
+                if ( (pid_file = (char*)strndup(optarg,PATH_MAX)) == NULL )
                     errx( 1, "strndup: failed to set pid-file override parameter.\n" );
                 memcpy( &spa_process.pidfile_path, pid_file, strnlen((const char*)pid_file,PATH_MAX) );
                 break;
             case 'c':
-                if ( (conf_file = (BYTE*)strndup(optarg,PATH_MAX)) == NULL )
+                if ( (conf_file = (char*)strndup(optarg,PATH_MAX)) == NULL )
                     errx( 1, "strndup: failed to set config-file override parameter.\n" );
                 break;
         }
@@ -144,7 +146,7 @@ int main( int argc, char **argv ) {
 
     // Load the service configuration.
     if ( strnlen( (const char*)conf_file, PATH_MAX ) <= 0 )
-        conf_file = default_conf_file;
+        conf_file = p_default_conf;
 
     // Start logging here based on target log-level.
     //   The program assumes DEBUG logging until the log_level conf is loaded.
@@ -181,8 +183,8 @@ int main( int argc, char **argv ) {
     //   TODO: implement a maximum thread count?
     __debuglog( write_log( "Entering main program iteration loop.\n", NULL ); )
     size_t nbytes;
-    BYTE recv_buffer[PACKET_BUFFER_SIZE];
-    BYTE send_buffer[PACKET_BUFFER_SIZE];
+    char recv_buffer[PACKET_BUFFER_SIZE];
+    char send_buffer[PACKET_BUFFER_SIZE];
     struct sockaddr_in6 clientaddr;
     while ( 1 ) {
         __debuglog( write_log( "Clearing send/recv buffers with memory size %d.\n", PACKET_BUFFER_SIZE ); )
@@ -214,7 +216,7 @@ int main( int argc, char **argv ) {
             p_sin6->sin6_port = p_sin4->sin_port;
             p_sin6->sin6_addr.s6_addr[10] = 0xFF;
             p_sin6->sin6_addr.s6_addr[11] = 0xFF;
-            memcpy( &p_sin6->sin6_addr.s6_addr[12], &p_sin4->sin_addr, sizeof(BYTE)*4 );
+            memcpy( &p_sin6->sin6_addr.s6_addr[12], &p_sin4->sin_addr, sizeof(char)*4 );
 
             memcpy( &clientaddr, p_sin6, sizeof(struct sockaddr_in6) );
             free( p_sin6 );
@@ -308,13 +310,13 @@ void* handle_packet( void* p_packet_meta ) {
 
 
         // Get string-like fields and forcibly null-terminate them.
-        BYTE username[SPA_PACKET_USERNAME_SIZE+1];
+        char username[SPA_PACKET_USERNAME_SIZE+1];
         memset( username, 0, SPA_PACKET_USERNAME_SIZE+1 );
         memcpy( username, &auth_packet->username, SPA_PACKET_USERNAME_SIZE );
         username[SPA_PACKET_USERNAME_SIZE] = '\0';
 
         // This is not necessary to null-term; it's not a string.
-        BYTE signature[SPA_PACKET_HASH_SIZE];
+        char signature[SPA_PACKET_HASH_SIZE];
         memset( signature, 0, SPA_PACKET_HASH_SIZE );
         memcpy( signature, &auth_packet->packet_hash, SPA_PACKET_HASH_SIZE );
 
@@ -353,7 +355,7 @@ void* handle_packet( void* p_packet_meta ) {
 
         if ( verify_timestamp( packet_id, &auth_packet->client_timestamp ) != EXIT_SUCCESS ) {
             __normallog( packet_syslog( *packet_id, LOG_NOTICE, "Inbound packet failed timestamp verification.\n", NULL ); )
-            send_response( packet_id, clientaddr, SPA_CODE_BAD_TIMESTAMP, (BYTE*)"Invalid timestamp" );
+            send_response( packet_id, clientaddr, SPA_CODE_BAD_TIMESTAMP, (char*)"Invalid timestamp" );
             goto handle_packet_cleanup_a;
         }
 
@@ -361,21 +363,21 @@ void* handle_packet( void* p_packet_meta ) {
         USER* p_user_data = get_config_for_user( username );
         if ( p_user_data == NULL || verify_username( packet_id, username ) != EXIT_SUCCESS ) {
             __normallog( packet_syslog( *packet_id, LOG_NOTICE, "Could not fetch configuration settings for user '%s'.\n", username ); )
-            send_response( packet_id, clientaddr, SPA_CODE_INVALID_USER, (BYTE*)"Invalid or illegal user" );
+            send_response( packet_id, clientaddr, SPA_CODE_INVALID_USER, (char*)"Invalid or illegal user" );
             goto handle_packet_cleanup_b;
         }
 
         if ( verify_packet_hash( packet_id, auth_packet ) != EXIT_SUCCESS ) {
             __normallog( packet_syslog( *packet_id, LOG_NOTICE, "Packet sha256 hash mismatch.\n", NULL ); )
-            send_response( packet_id, clientaddr, SPA_CODE_HASH_MISMATCH, (BYTE*)"sha256 mismatch" );
+            send_response( packet_id, clientaddr, SPA_CODE_HASH_MISMATCH, (char*)"sha256 mismatch" );
             goto handle_packet_cleanup_b;
         }
 
-        if ( get_config_flag( SPA_CONF_FLAG_PREVENT_REPLAY ) == EXIT_SUCCESS ) {
+        if ( SPAConf__get_flag( SPA_CONF_FLAG_PREVENT_REPLAY ) == EXIT_SUCCESS ) {
             __verboselog( packet_log( *packet_id, "+++ Checking packet hash for replays.\n", NULL ); )
             if ( check_for_replay( &auth_packet->packet_hash[0] ) != EXIT_SUCCESS ) {
                 __normallog( packet_syslog( *packet_id, LOG_NOTICE, "Packet replay detected. Same hash within last '%d' seconds.\n", spa_conf.validity_window ); )
-                send_response( packet_id, clientaddr, SPA_CODE_REPLAYED, (BYTE*)"Replay detected" );
+                send_response( packet_id, clientaddr, SPA_CODE_REPLAYED, (char*)"Replay detected" );
                 goto handle_packet_cleanup_b;
             }
         }
@@ -385,21 +387,21 @@ void* handle_packet( void* p_packet_meta ) {
         if ( verify_action( packet_id, p_spa_action, &auth_packet->request_action ) != EXIT_SUCCESS ) {
             __normallog( packet_syslog( *packet_id, LOG_NOTICE, "Action ID '%d' is not a loaded or valid action.\n", auth_packet->request_action ); )
             // Issue a response, depending on the program MODE setting.
-            send_response( packet_id, clientaddr, SPA_CODE_INVALID_ACTION, (BYTE*)"Invalid action ID" );
+            send_response( packet_id, clientaddr, SPA_CODE_INVALID_ACTION, (char*)"Invalid action ID" );
             goto handle_packet_cleanup_c;
         }
 
         if ( verify_pubkey( packet_id, p_user_data ) != EXIT_SUCCESS ) {
             __normallog( packet_syslog( *packet_id, LOG_NOTICE, "User '%s' does not have a valid public key.\n", username ); )
             // Issue a response, depending on the program MODE setting.
-            send_response( packet_id, clientaddr, SPA_CODE_INVALID_PKEY, (BYTE*)"Invalid user public key" );
+            send_response( packet_id, clientaddr, SPA_CODE_INVALID_PKEY, (char*)"Invalid user public key" );
             goto handle_packet_cleanup_c;
         }
 
         if ( verify_signature( packet_id, auth_packet, p_user_data ) != EXIT_SUCCESS ) {
             __normallog( packet_syslog( *packet_id, LOG_NOTICE, "Packet crypto signature failed to verify.\n", NULL ); )
             // Issue a response, depending on the program MODE setting.
-            send_response( packet_id, clientaddr, SPA_CODE_INVALID_SIGNATURE, (BYTE*)"Crypto signature invalid" );
+            send_response( packet_id, clientaddr, SPA_CODE_INVALID_SIGNATURE, (char*)"Crypto signature invalid" );
             goto handle_packet_cleanup_c;
         }
 
@@ -409,13 +411,13 @@ void* handle_packet( void* p_packet_meta ) {
                     username, auth_packet->request_action, auth_packet->request_option );
             )
             // Issue a response, depending on the program MODE setting.
-            send_response( packet_id, clientaddr, SPA_CODE_NOT_AUTHORIZED, (BYTE*)"User is not authorized" );
+            send_response( packet_id, clientaddr, SPA_CODE_NOT_AUTHORIZED, (char*)"User is not authorized" );
             goto handle_packet_cleanup_c;
         }
 
 
         // If applicable, record the packet signature so it cannot be used again.
-        if ( get_config_flag( SPA_CONF_FLAG_PREVENT_REPLAY ) == EXIT_SUCCESS ) {
+        if ( SPAConf__get_flag( SPA_CONF_FLAG_PREVENT_REPLAY ) == EXIT_SUCCESS ) {
             __verboselog( packet_log( *packet_id, "+++ Recording packet hash into the time-based linked list.\n", NULL ); )
             create_replay_record( &auth_packet->packet_hash[0], &auth_packet->client_timestamp );
         }
@@ -424,7 +426,7 @@ void* handle_packet( void* p_packet_meta ) {
         // Issue a response, depending on the program MODE setting.
         //   This should be done _before_ performing the action, since an authorized function may have a delay involved.
         if ( send_response( packet_id, clientaddr, SPA_CODE_SUCCESS,
-                (BYTE*)"Successful action authorization" ) != EXIT_SUCCESS ) {
+                (char*)"Successful action authorization" ) != EXIT_SUCCESS ) {
             goto handle_packet_cleanup_c;
         }
 
@@ -477,7 +479,7 @@ uint64_t generate_packet_id() {
 
 
 int send_response( uint64_t* packet_id, struct sockaddr_in6* p_clientaddr,
-    uint16_t response_code, BYTE* response_msg ) {
+    uint16_t response_code, char* response_msg ) {
 /*
 # Valid selections are:
 #   dead: The service won't even respond to successful, authorized SPA packets. Completely silent.
@@ -552,7 +554,7 @@ __debuglog(
     // Now, actually send the populated response data.
 # ifdef DEBUG
 __debuglog( packet_log( *packet_id, "Sending response datagram with payload hexdump:\n", NULL ); )
-print_hex( (BYTE*)p_resp_packet, sizeof(struct spa_response_packet_t) );
+print_hex( (char*)p_resp_packet, sizeof(struct spa_response_packet_t) );
 # endif
 
     int sentbytes = -1;
@@ -563,18 +565,18 @@ print_hex( (BYTE*)p_resp_packet, sizeof(struct spa_response_packet_t) );
         memcpy( &p_ip4->sin_addr, &p_clientaddr->sin6_addr.s6_addr[12], 4 );
 # ifdef DEBUG
     __debuglog( printf( "=== Dumping sendto sockaddr_in:\n" ); )
-    print_hex( (BYTE*)p_ip4, sizeof(struct sockaddr_in) );
+    print_hex( (char*)p_ip4, sizeof(struct sockaddr_in) );
 # endif
-        sentbytes = sendto( mainsockfd, (BYTE*)p_resp_packet,
+        sentbytes = sendto( mainsockfd, (char*)p_resp_packet,
             sizeof( struct spa_response_packet_t ),
             0, (struct sockaddr*)p_ip4, (socklen_t)sizeof(struct sockaddr_in) );
         free( p_ip4 );
     } else {
 # ifdef DEBUG
     __debuglog( printf( "=== Dumping sendto sockaddr_in6:\n" ); )
-    print_hex( (BYTE*)p_clientaddr, sizeof(struct sockaddr_in6) );
+    print_hex( (char*)p_clientaddr, sizeof(struct sockaddr_in6) );
 # endif
-        sentbytes = sendto( mainsockfd, (BYTE*)p_resp_packet,
+        sentbytes = sendto( mainsockfd, (char*)p_resp_packet,
             sizeof( struct spa_response_packet_t ),
             0, (struct sockaddr*)p_clientaddr, (socklen_t)sizeof(struct sockaddr_in6) );
     }
@@ -622,7 +624,7 @@ void spawn_socket() {
     sock6.sin6_port = htons( (spa_conf.bind_port <= 0 ? SPA_DEFAULT_BIND_PORT : spa_conf.bind_port) );
 
     __debuglog( write_log( "Setting socket options.\n", NULL ); )
-    BYTE* p_if = &spa_conf.bind_interface[0];
+    char* p_if = &spa_conf.bind_interface[0];
     int is_any_interface = OFF;
     if ( strncmp( (const char*)p_if, "any", IF_NAMESIZE ) != 0 ) {
         __normallog( write_log( "* Binding to interface '%s'.\n", p_if ); )
@@ -643,7 +645,7 @@ void spawn_socket() {
             write_error_log_append( "setsockopt:IPV6_V6ONLY", NULL );
     }
 
-    BYTE* p_baddr = &spa_conf.bind_address[0];
+    char* p_baddr = &spa_conf.bind_address[0];
     if ( strncmp( (const char*)p_baddr, "any", INET6_ADDRSTRLEN ) != 0 ) {
         __debuglog( write_log( "* Attempting to bind to address '%s'.\n", p_baddr ); )
 
@@ -656,7 +658,7 @@ void spawn_socket() {
 
         // Interpret the given address for validity.
         int __baddrfam = AF_INET;
-        for ( BYTE* p = &p_baddr[0]; p < (p_baddr+INET6_ADDRSTRLEN); p++ ) {
+        for ( char* p = &p_baddr[0]; p < (p_baddr+INET6_ADDRSTRLEN); p++ ) {
             if ( *p == ':' )  __baddrfam = AF_INET6;
         }
         if ( __baddrfam != AF_INET && (IS_IPV4_ONLY) ) {
@@ -769,8 +771,8 @@ void handle_signal( int signal ) {
         write_syslog( LOG_WARNING, "Received signal SIGHUP. Reloading configuration...\n", NULL );
 
         __debuglog( write_log( "Reading process meta-info for configuration path.\n", NULL ); )
-        BYTE conf_path_c[PATH_MAX];
-        BYTE* conf_path = &conf_path_c[0];
+        char conf_path_c[PATH_MAX];
+        char* conf_path = &conf_path_c[0];
         memset( conf_path, 0, PATH_MAX );
         memcpy( conf_path, &spa_process.config_path, strnlen((const char*)spa_process.config_path,PATH_MAX) );
         __debuglog( write_log( "Got conf path: |%s|\n", conf_path ); )
