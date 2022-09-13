@@ -16,6 +16,9 @@
 #ifndef SPA_LOG_H
 #define SPA_LOG_H
 
+#include <syslog.h>
+#include <stdint.h>
+
 
 
 // LOGGING MACROS:
@@ -76,6 +79,11 @@ void SPALog__write(
     const char* format,
     ...
 );
+
+# ifdef DEBUG
+// Used to print raw information about a packet or other data in memory.
+void print_hex( char* data, unsigned long len );
+# endif
 
 
 

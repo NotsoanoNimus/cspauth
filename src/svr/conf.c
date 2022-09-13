@@ -29,7 +29,6 @@
 #include <string.h>
 #include <linux/limits.h>
 #include <openssl/x509.h>
-#include <net/if.h>
 #include <arpa/inet.h>
 
 
@@ -435,7 +434,7 @@ int SPAConf__parse( const char* p_conf_path ) {
                 }
             }
 
-            if (  strnlen( (const char*)(&(p_user->pkey.key_path[0])), PATH_MAX ) > 0  ) {
+            if (  strnlen( (const char*)(&(p_user->pkey_path[0])), PATH_MAX ) > 0  ) {
                 if (  EXIT_SUCCESS != SPAConf__get_flag( SPA_CONF_FLAG_SKIP_INVALID_PKEY )  ) {
                     write_error_log( "Config line %d: user '%s' already has a pubkey defined.",
                         line_num, p_user->username );
@@ -774,7 +773,7 @@ static inline int SPAConf__check() {
     }
 
     // pubkey check -- sweep all users and if skip_invalid_pubkeys isn't enabled, throw an error on missing keys
-    spa_user_t* p_user_base = (spa_user_t*)(SPAUser__get_array());   // start at the base of the array
+    spa_user_t* p_user_base = SPAUser__get_array();   // start at the base of the array
     for ( size_t x = 0; x < SPAUser__count(); x++  ) {
         spa_user_t* p_user = (p_user_base + x);
 

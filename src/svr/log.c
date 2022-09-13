@@ -21,6 +21,8 @@
 #include "../spa.h"
 #include "conf.h"
 
+#include <err.h>
+
 
 
 // Write to the log according to the log-type.
@@ -49,7 +51,10 @@ void SPALog__write(
     //   3: The configuration failed to load successfully and it's a normal log message (for pre-load instances).
     if ( (log_type & ERROR_SYSLOG) > 0
         || IS_DAEMONIZED
-        || ( (log_type & ERROR_NONE) > 0 && get_config_flag( SPA_CONF_FLAG_LOAD_SUCCESS ) != EXIT_SUCCESS )
+        || (
+               (log_type & ERROR_NONE) > 0
+            && EXIT_SUCCESS != SPAConf__get_flag( SPA_CONF_FLAG_LOAD_SUCCESS )
+        )
     )  vsyslog( log_priority, format, ap );
 
     // Regardless of daemonization and syslog params, write the message out to the appropriate stream.
@@ -63,3 +68,17 @@ void SPALog__write(
     va_end( ap );
     va_end( ap2 );
 }
+
+
+
+# ifdef DEBUG
+// Used to print raw information about a packet or other data in memory.
+void print_hex( char* data, unsigned long len ) {
+    for ( unsigned long i = 0; i < len; i++ ) {
+        if ( !(i % 8) )   fprintf( stderr, "  " );
+        if ( !(i % 16) )  fprintf( stderr, "\n" );
+        fprintf( stderr, "%02x ", data[i] );
+    }
+    fprintf( stderr, "\n\n" );
+}
+# endif

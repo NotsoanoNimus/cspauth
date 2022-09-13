@@ -19,7 +19,7 @@
 #include "../spa.h"
 #include "action.h"
 
-
+#include <net/if.h>
 
 // Global daemon configuration flags.
 #define SPA_CONF_FLAG_LOAD_SUCCESS      ( 1 << 1 )

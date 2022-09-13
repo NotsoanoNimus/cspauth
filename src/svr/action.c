@@ -28,10 +28,15 @@
 
 // Allocate a pointer array space on the heap to dynamically manage loaded actions.
 //   The point of this space is to remove the project dependency on linked lists.
-static void* p_actions_base = calloc( 1, (sizeof(spa_action_t*) * SPA_MAX_ACTIONS) );
+static void* p_actions_base = NULL;
 static unsigned long actions_count = 0;
 
 
+
+// Create the allocation for the actions to use.
+void SPAAction__init() {
+    p_actions_base = calloc( 1, (sizeof(spa_action_t*) * SPA_MAX_ACTIONS) );
+}
 
 // Return the internal array's length.
 unsigned long SPAAction__count() {
@@ -41,7 +46,7 @@ unsigned long SPAAction__count() {
 // Deeply clear the heap array.
 void SPAAction__clear() {
     for ( unsigned long x = 0; x < actions_count; x++ )
-        free( (p_actions_base+(sizeof(spa_action_t*)*x)) );
+        free( (void*)(*((spa_action_t**)(p_actions_base + (sizeof(spa_action_t*)*x)))) );
 
     memset(  p_actions_base, 0, (sizeof(spa_action_t*) * SPA_MAX_ACTIONS)  );
     actions_count = 0;
@@ -51,13 +56,16 @@ void SPAAction__clear() {
 // Get an action from the linked list using the unique action ID.
 spa_action_t* SPAAction__get( uint16_t action ) {
     if (  EXIT_SUCCESS == SPAConf__get_flag( SPA_CONF_FLAG_GENERIC_ACTION )  ) {
-        __debuglog(  write_log( "+++ Skipping action ID check: generic_action is set.\n", NULL );  )
+        __debuglog(
+            write_log( "+++ Skipping action ID check: generic_action is set.\n", NULL );
+        )
         return &(spa_conf.generic_action);
     } else if ( 0 == actions_count )  return NULL;
 
     for ( size_t x = 0; x < actions_count; x++ ) {
-        spa_action_t* p_item = (spa_action_t*)(p_actions_base + (sizeof(spa_action_t*)*x));
-        if (  action == p_item->action_id  )
+        spa_action_t* p_item = *((spa_action_t**)(p_actions_base + (sizeof(spa_action_t*)*x)));
+
+        if (  NULL != p_item && action == p_item->action_id  )
             return p_item;
     }
 

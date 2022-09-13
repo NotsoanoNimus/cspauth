@@ -76,6 +76,8 @@ int main( int argc, char **argv ) {
 
     // Other initializations.
     openssl_init();
+    SPAUser__init();
+    SPAAction__init();
 
     char* syslog_tag = (char*)"cspauthd";
     memcpy( &spa_process.syslog_tag[0], syslog_tag,

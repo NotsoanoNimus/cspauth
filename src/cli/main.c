@@ -15,6 +15,8 @@
  *
  */
 
+#include "../spa.h"
+#include "../integrity.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,11 +31,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-
-#include "../spa.h"
-#include "../integrity.h"
-
-
+#include <openssl/x509.h>
+#include <openssl/err.h>
+#include <openssl/pem.h>
+#include <openssl/rsa.h>
 
 #define __debug( ... ) \
     if ( is_debug == ON ) {  __VA_ARGS__ }
@@ -84,11 +85,11 @@ void handle_signal( int signal );
 // Used to validate a string as a legitimate, in-range uint16_t value and return it accordingly.
 uint16_t get_valid_uint16( char* str, char* type );
 // Signs a packet and stores its signature on the pointed packet.
-int sign_packet( BYTE* key_file, spa_packet_t* p_packet, int is_debug );
+int sign_packet( char* key_file, spa_packet_t* p_packet, int is_debug );
 
 # ifdef DEBUG
 // Used to print raw information about a packet or other data in memory.
-void print_hex( BYTE* data, size_t len );
+void print_hex( char* data, size_t len );
 # endif
 
 
@@ -119,20 +120,20 @@ int main( int argc, char** argv ) {
     int cli_opt;
 
 
-    BYTE key_file_c[PATH_MAX];
-    BYTE* p_key_file = &key_file_c[0];
+    char key_file_c[PATH_MAX];
+    char* p_key_file = &key_file_c[0];
     memset( p_key_file, 0, PATH_MAX );
 
-    BYTE user_c[SPA_PACKET_USERNAME_SIZE];
-    BYTE* p_user = &user_c[0];
+    char user_c[SPA_PACKET_USERNAME_SIZE];
+    char* p_user = &user_c[0];
     memset( p_user, 0, SPA_PACKET_USERNAME_SIZE );
 
-    BYTE tgtnode_c[MAX_TARGET_STRLEN];
-    BYTE* p_tgtnode = &tgtnode_c[0];
+    char tgtnode_c[MAX_TARGET_STRLEN];
+    char* p_tgtnode = &tgtnode_c[0];
     memset( p_tgtnode, 0, MAX_TARGET_STRLEN );
 
-    BYTE data_c[SPA_PACKET_DATA_SIZE];
-    BYTE* p_data = &data_c[0];
+    char data_c[SPA_PACKET_DATA_SIZE];
+    char* p_data = &data_c[0];
     memset( p_data, 0, SPA_PACKET_DATA_SIZE );
 
     uint16_t tgtport = 0;
@@ -308,8 +309,8 @@ int main( int argc, char** argv ) {
         __debug(  printf( "+ Unspecified data string; generating random data.\n" );  )
         // if the data field is not set, randomize the data
         srandom( (unsigned int)time(NULL) );
-        for ( BYTE* p = p_data; p < (p_data+SPA_PACKET_DATA_SIZE); p++ )
-            *p = (BYTE)(random() & 0xFF);
+        for ( char* p = p_data; p < (p_data+SPA_PACKET_DATA_SIZE); p++ )
+            *p = (char)(random() & 0xFF);
     }
 
 
@@ -393,7 +394,7 @@ int main( int argc, char** argv ) {
 # ifdef DEBUG
     __debug(
         printf( "SOCKADDR object dump:\n" );
-        print_hex( (BYTE*)p_addr, addrfam == AF_INET
+        print_hex( (char*)p_addr, addrfam == AF_INET
             ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) );
     )
 # endif
@@ -451,7 +452,7 @@ int main( int argc, char** argv ) {
 # ifdef DEBUG
     __debug(
         printf( "Packet dump '%lu':\n", dispatch_len );
-        print_hex( (BYTE*)p_packet, dispatch_len );
+        print_hex( (char*)p_packet, dispatch_len );
     )
 # endif
 
@@ -462,7 +463,7 @@ int main( int argc, char** argv ) {
 
     int sentbytes = -1;
     sentbytes = sendto(
-        sockfd, (BYTE*)p_packet, dispatch_len, 0, (struct sockaddr*)p_addr,
+        sockfd, (char*)p_packet, dispatch_len, 0, (struct sockaddr*)p_addr,
         (socklen_t)( (addrfam == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) )
     );
 
@@ -489,7 +490,7 @@ int main( int argc, char** argv ) {
         free( p_tv );
 
         size_t recvbytes;
-        BYTE recv_buffer[PACKET_BUFFER_SIZE];
+        char recv_buffer[PACKET_BUFFER_SIZE];
         memset( &recv_buffer[0], 0, PACKET_BUFFER_SIZE );
 
         printf( "Awaiting UDP response from remote server for %d seconds...\n", wait_time );
@@ -592,7 +593,7 @@ uint16_t get_valid_uint16( char* str, char* type ) {
 
 
 // Verify the actual crypto signature attached to the packet.
-int sign_packet( BYTE* key_file, spa_packet_t* p_packet, int is_debug ) {
+int sign_packet( char* key_file, spa_packet_t* p_packet, int is_debug ) {
     __debug(  printf( "crypto: Checking packet's SHA256 signature with the user's pubkey.\n" );  )
 
     int rc = -1;
@@ -600,7 +601,7 @@ int sign_packet( BYTE* key_file, spa_packet_t* p_packet, int is_debug ) {
     EVP_PKEY* pkey = NULL;
 
     EVP_MD_CTX* mdctx = NULL;
-    BYTE* sig = NULL;
+    char* sig = NULL;
 
     size_t slen = 0;
 
@@ -637,11 +638,11 @@ int sign_packet( BYTE* key_file, spa_packet_t* p_packet, int is_debug ) {
         goto __err;
 
     __debug(  printf( "crypto: Allocating _predicted_ space for signature copy.\n" );  )
-    if (  !(sig = (BYTE*)OPENSSL_malloc( sizeof(BYTE)*slen ))  )
+    if (  !(sig = (char*)OPENSSL_malloc( sizeof(char)*slen ))  )
         goto __err;
 
     __debug(  printf( "crypto: Generating signature...\n" ); )
-    if (  1 != EVP_DigestSignFinal( mdctx, sig, &slen )  )
+    if (  1 != EVP_DigestSignFinal( mdctx, (unsigned char*)sig, &slen )  )
         goto __err;
 
     rc = 1;
@@ -657,7 +658,7 @@ int sign_packet( BYTE* key_file, spa_packet_t* p_packet, int is_debug ) {
     p_packet->signature_length = (slen & 0xFFFFFFFF);
 
     __debug(  printf( "crypto: Copying generated signature to packet buffer.\n" );  )
-    memcpy(  &(p_packet->packet_signature[0]), sig, (sizeof(BYTE)*slen)  );
+    memcpy(  &(p_packet->packet_signature[0]), sig, (sizeof(char)*slen)  );
 
 
     // This label is always reached, but only returns failure if the return code (rc) is not 1.
@@ -691,7 +692,7 @@ int sign_packet( BYTE* key_file, spa_packet_t* p_packet, int is_debug ) {
 
 # ifdef DEBUG
 // Used to print raw information about a packet or other data in memory.
-void print_hex( BYTE* data, size_t len ) {
+void print_hex( char* data, size_t len ) {
     for ( size_t i = 0; i < len; i++ ) {
         if ( !(i % 8) )   fprintf( stderr, "  " );
         if ( !(i % 16) )  fprintf( stderr, "\n" );

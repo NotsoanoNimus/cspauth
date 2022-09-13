@@ -19,16 +19,6 @@
 #ifndef SPA_INTEGRITY_H
 #define SPA_INTEGRITY_H
 
-
-
-#include <stddef.h>
-#include <stdlib.h>
-#include <string.h>
-#include <openssl/x509.h>
-#include <openssl/err.h>
-#include <openssl/pem.h>
-#include <openssl/rsa.h>
-
 #include "spa.h"
 
 
@@ -36,9 +26,9 @@
 // Initialize OpenSSL.
 void openssl_init();
 // Get a SHA256 hash digest.
-int sha256_digest( BYTE* dest_buffer, const void* src_buffer, int buffer_len );
+int sha256_digest( char* dest_buffer, const void* src_buffer, int buffer_len );
 // Hashes an incoming SPA packet and returns the length of the resulting hash. If <= 0, error.
-int hash_packet( BYTE* dst_buffer, spa_packet_t* p_packet );
+int hash_packet( char* dst_buffer, spa_packet_t* p_packet );
 
 
 

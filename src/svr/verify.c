@@ -23,6 +23,11 @@
 #include "conf.h"
 #include "../integrity.h"
 
+#include <openssl/x509.h>
+#include <openssl/err.h>
+#include <openssl/pem.h>
+#include <openssl/rsa.h>
+
 
 
 // Packet pre-filtering. Anything rejected at this stage will NEVER emit a response packet, regardless of mode.
@@ -110,7 +115,7 @@ int verify_username( uint64_t packet_id, char* p_username ) {
     if ( spa_conf.log_level >= verbose )
         spa_conf.log_level = debug;
 
-    spa_user_t* p_user = SPAUser__get( username );
+    spa_user_t* p_user = SPAUser__get( p_username );
 
     if ( NULL == p_user ) {
         spa_conf.log_level = old_level;
@@ -197,7 +202,7 @@ int verify_action( uint64_t packet_id, spa_action_t* p_spa_action, uint16_t acti
     spa_conf.log_level = old_level;
 
     __verboselog(
-        packet_log( *packet_id, "+++++ Action ID is OK.\n", NULL );
+        packet_log( packet_id, "+++++ Action ID is OK.\n", NULL );
     )
     return EXIT_SUCCESS;
 }
@@ -220,7 +225,7 @@ int verify_authorization(
     }
 
     __verboselog(
-        packet_log( *packet_id, "+++ Checking authorization of user '%s' for"
+        packet_log( packet_id, "+++ Checking authorization of user '%s' for"
             " action ID '%d' with option '%d'.\n", p_user_data->username, action, option );
     )
 
@@ -300,13 +305,13 @@ int verify_signature(
     int rc = -255;
 
     __debuglog(  printf( "***** Ensuring a user pubkey exists.\n" );  )
-    if (  NULL == p_user_data->pkey.evp_pkey  )
+    if (  NULL == p_user_data->pkey  )
         goto __err;
 
-    int keysize = EVP_PKEY_size( (p_user_data->pkey).evp_pkey );
+    int keysize = EVP_PKEY_size( p_user_data->pkey );
     __debuglog(
         printf( "******* Got user pubkey size of '%d' bits, signature approx '%d' bytes.\n",
-            EVP_PKEY_bits( p_user_data->pkey.evp_pkey ), keysize );
+            EVP_PKEY_bits( p_user_data->pkey ), keysize );
     )
     if ( keysize <= 0 )
         goto __err;
@@ -322,7 +327,7 @@ int verify_signature(
         goto __err;
 
     __debuglog(  printf( "***** Initializing message digest context.\n" );  )
-    if (  1 != EVP_DigestVerifyInit( mdctx, NULL, EVP_sha256(), NULL, (p_user_data->pkey).evp_pkey )  )
+    if (  1 != EVP_DigestVerifyInit( mdctx, NULL, EVP_sha256(), NULL, p_user_data->pkey )  )
         goto __err;
 
     __debuglog(  printf( "***** Updating message digest context.\n" );  )
@@ -330,7 +335,7 @@ int verify_signature(
         goto __err;
 
     __debuglog(  printf( "***** Verifying signature...\n" );  )
-    rc = EVP_DigestVerifyFinal( mdctx, &(p_spa_packet->packet_signature[0]), siglen );
+    rc = EVP_DigestVerifyFinal( mdctx, (unsigned char*)&(p_spa_packet->packet_signature[0]), siglen );
 
 
     __err:

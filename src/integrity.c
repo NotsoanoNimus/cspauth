@@ -17,6 +17,14 @@
 
 #include "integrity.h"
 
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+#include <openssl/x509.h>
+#include <openssl/err.h>
+#include <openssl/pem.h>
+#include <openssl/rsa.h>
+
 
 
 void openssl_init() {
@@ -27,7 +35,7 @@ void openssl_init() {
 
 
 
-int sha256_digest( BYTE* dest_buffer, const void* src_buffer, int buffer_len ) {
+int sha256_digest( char* dest_buffer, const void* src_buffer, int buffer_len ) {
     int retcode = EXIT_FAILURE;
 
     SHA256_CTX sha_ctx;
@@ -35,18 +43,18 @@ int sha256_digest( BYTE* dest_buffer, const void* src_buffer, int buffer_len ) {
 
     if ( SHA256_Init( &sha_ctx ) != 1 )  return retcode;
     if ( SHA256_Update( &sha_ctx, src_buffer, buffer_len ) != 1 )  return retcode;
-    if ( SHA256_Final( dest_buffer, &sha_ctx ) != 1 )  return retcode;
+    if ( SHA256_Final( (unsigned char*)dest_buffer, &sha_ctx ) != 1 )  return retcode;
 
     return EXIT_SUCCESS;
 }
 
 
 
-int hash_packet( BYTE* dst_buffer, spa_packet_t* p_packet ) {
-    BYTE hashed_content[SPA_PACKET_HASHED_SECTION_LEN];
+int hash_packet( char* dst_buffer, spa_packet_t* p_packet ) {
+    char hashed_content[SPA_PACKET_HASHED_SECTION_LEN];
     memcpy( &hashed_content[0], p_packet, SPA_PACKET_HASHED_SECTION_LEN );
 
-    if (  sha256_digest( dst_buffer, hashed_content, SPA_PACKET_HASHED_SECTION_LEN ) == EXIT_FAILURE  )
+    if (  EXIT_FAILURE == sha256_digest( dst_buffer, hashed_content, SPA_PACKET_HASHED_SECTION_LEN )  )
         return -1;
 
     return SHA256_DIGEST_LENGTH;

@@ -27,79 +27,140 @@
 
 
 
-LIST* replays_list = NULL;
-int __spa_replay_monitor_is_init = OFF;
+// Holds a packet hash and a timestamp.
+typedef struct _spa_replay_record_t {
+    char hash[SPA_PACKET_HASH_SIZE];
+    uint64_t time;
+} spa_replay_record_t;
 
-pthread_t __spa_replay_monitor_thread;
-pthread_attr_t __spa_replay_monitor_thread_attributes;
-pthread_mutex_t __spa_replay_record_lock = PTHREAD_MUTEX_INITIALIZER;
+// Internal linked-list structures exclusive to the replay monitor.
+//   Using this will prevent the necessity of allocating some predefined limited array of pointers
+//   which can be spammed and overflowed to defeat replay protections.
+typedef struct simple_list_node {
+    spa_replay_record_t record;
+    struct simple_list_node* p_next;
+} list_node_t;
+typedef struct simple_list {
+    list_node_t* p_head;
+} list_t;
+
+
+static list_t hashes;
+
+static int spa_replay_monitor_is_init = OFF;
+static unsigned long hashes_count = 0;
+
+static pthread_t spa_replay_monitor_thread;
+static pthread_attr_t spa_replay_monitor_thread_attributes;
+static pthread_mutex_t spa_replay_record_lock = PTHREAD_MUTEX_INITIALIZER;
 
 
 
-// Push a new hash onto the beginning of the stack.
-void _spa_replay_record_push( BYTE* hash, uint64_t* time ) {
-    malloc_sizeof( REPLAY_RECORD, new_head );
+// Push a new hash onto the array
+static inline void _spa_replay_record_push( char* hash, uint64_t time ) {
+    pthread_mutex_lock( &spa_replay_record_lock );
 
-    memcpy( &new_head->hash, hash, SPA_PACKET_HASH_SIZE );
-    memcpy( &new_head->time, time, sizeof(uint64_t) );
+    list_node_t* p_new = (list_node_t*)calloc( 1, sizeof(list_node_t) );
 
-    list_add_node( replays_list, new_head );
+    memcpy( &((p_new->record).hash), hash, SPA_PACKET_HASH_SIZE );
+    (p_new->record).time = time;
+
+    // Set the next ptr to the old HEAD and set the HEAD to the newly alloc'd item. Quick insertion.
+    p_new->p_next = hashes.p_head;
+    hashes.p_head = p_new;
+
+    hashes_count++;
+    pthread_mutex_unlock( &spa_replay_record_lock );
 }
 
 
 
 // Drop all records from memory which are older than now minus the validity window.
 //   THIS SHOULD ALWAYS BE RUN BEFORE QUERYING ANY RECORDS.
-void* _spa_replay_record_cleanup( void* nonce ) {
+static void* _spa_replay_record_cleanup( void* nonce ) {
     while ( 1 ) {
-        pthread_mutex_lock( &__spa_replay_record_lock );
+        pthread_mutex_lock( &spa_replay_record_lock );
 
 # ifdef DEBUG
-__debuglog( printf( " ***** (REPLAY MONITOR TICK - WATCHING '%d' HASHES) *****\n", list_get_count( replays_list ) ); )
+    __debuglog(
+        printf( " ***** (REPLAY MONITOR TICK - WATCHING '%lu' HASHES) *****\n", hashes_count );
+    )
 # endif
 
+        // Get the current timestampe.
         time_t now;
         time( &now );
         uint64_t epoch_time = (uint64_t)now;
 
-        LIST_NODE* current = list_get_head_node( replays_list );
-        if ( current == NULL )  goto __spa_replay_continue_monitor;
+        list_node_t* p_current = hashes.p_head;
+        if ( NULL == p_current )
+            goto spa_replay_continue_monitor;
+
         int iteration = 1;
 
-        while ( current != NULL ) {
-            REPLAY_RECORD* current_node = ((REPLAY_RECORD*)(current->node));
-            if ( current_node == NULL )  continue;
+        while ( NULL != p_current ) {
+            spa_replay_record_t* p_node = &(p_current->record);
+            if ( NULL == p_node )  continue;
 
-            if ( current_node->time <= (epoch_time - ((uint64_t)(spa_conf.validity_window & 0x00000000FFFFFFFF))) ) {
+            // Check if the entry is stale. If so, remove it; else, continue.
+            if ( p_node->time <= (epoch_time - ((uint64_t)(spa_conf.validity_window & 0x00000000FFFFFFFF))) ) {
 # ifdef DEBUG
-__debuglog(
-    printf( " ***** (MONITOR STACK: FREEING STALE ENTRY AT '%d' OF '%d' RECORDS) *****\n", iteration, list_get_count( replays_list ) );
-)
+                __debuglog(
+                    printf( " ***** (MONITOR STACK: FREEING STALE ENTRY AT '%d' OF '%lu' RECORDS) *****\n",
+                        iteration, hashes_count );
+                )
 # endif
+
                 __debuglog(
                     char sigtohex[(SPA_PACKET_HASH_SIZE*2) + 1];
                     memset( sigtohex, 0, (SPA_PACKET_HASH_SIZE*2)+1 );
+
                     for ( int i = 0; i < SPA_PACKET_HASH_SIZE; i++ )
-                        snprintf( &sigtohex[i*2], 3, "%02x", (unsigned int)current_node->hash[i] );
+                        snprintf(  &sigtohex[i*2], 3, "%02x", (unsigned int)p_node->hash[i]  );
                     sigtohex[SPA_PACKET_HASH_SIZE*2] = '\0';
+
                     printf( " ***** [%lu] MONITOR: Releasing monitored packet hash '[...]%s' from time"
-                        " '%lu'. *****\n", epoch_time, &sigtohex[(SPA_PACKET_HASH_SIZE*2)-12], current_node->time );
+                        " '%lu'. *****\n", epoch_time, &sigtohex[(SPA_PACKET_HASH_SIZE*2)-12], p_node->time );
                 )
 
-                LIST_NODE* prev_node = list_remove_node( replays_list, current );
-                if ( prev_node == NULL && list_get_count( replays_list ) > 0 ) {
-                    prev_node = list_get_head_node( replays_list );
-                } else if ( prev_node == NULL )  break;
-                current = prev_node->next;
+                // Iterate the linked list until the p_current node is next in line.
+                list_node_t* p_tmp = hashes.p_head;
+                while (
+                       NULL != p_tmp
+                    && p_tmp != p_current
+                    && p_tmp->p_next != p_current
+                    && NULL != p_tmp->p_next
+                )  p_tmp = p_tmp->p_next;
+
+                if ( p_tmp == p_current && hashes.p_head == p_current ) {
+                    hashes.p_head = p_current->p_next;
+                    free( p_current );
+                    p_current = hashes.p_head;
+
+                    hashes_count--;
+                    continue;
+                } else {
+                    // Bridge the gap to the next node in the list.
+                    p_tmp->p_next = p_current->p_next;
+
+                    list_node_t* p_shadow = p_current->p_next;
+                    free( p_current );
+                    p_current = p_shadow;
+
+                    hashes_count--;
+                }
+
             } else {
-                current = current->next;
                 iteration++;
             }
+
+            // Next list item.
+            p_current = p_current->p_next;
         }
 
-        __spa_replay_continue_monitor:
-            pthread_mutex_unlock( &__spa_replay_record_lock );
-
+        // Function that unlocks the mutex and waits so as to not burn CPU cycles.
+        spa_replay_continue_monitor:
+            pthread_mutex_unlock( &spa_replay_record_lock );
             sleep( MIN_VALIDITY_WINDOW );
     }
 }
@@ -109,43 +170,49 @@ __debuglog(
 // ========== "PUBLIC" METHODS IN HEADER FILE ==========
 
 // Spawn a lone thread responsible for keeping the replay_record memory "db" clean.
-int prevent_replay_init() {
-    if ( __spa_replay_monitor_is_init != OFF ) {
+int SPAReplay__init() {
+    if ( OFF != spa_replay_monitor_is_init ) {
         write_error_log( "The replay monitor thread has already been initialized.\n", NULL );
     }
 
-    replays_list = new_list( UINT64_MAX - 1 );
+    // Initial value of NULL (empty list).
+    hashes.p_head = NULL;
 
-    pthread_attr_init( &__spa_replay_monitor_thread_attributes );
-    pthread_attr_setdetachstate( &__spa_replay_monitor_thread_attributes, 1 );
+    // Initialize a new monitor thread and set it to detached.
+    pthread_attr_init( &spa_replay_monitor_thread_attributes );
+    pthread_attr_setdetachstate( &spa_replay_monitor_thread_attributes, 1 );
 
-    int rc = pthread_create( &__spa_replay_monitor_thread,
-        &__spa_replay_monitor_thread_attributes, _spa_replay_record_cleanup, NULL );
-    if ( rc != 0 )  return EXIT_FAILURE;
+    int rc = pthread_create(
+        &spa_replay_monitor_thread,
+        &spa_replay_monitor_thread_attributes,
+        _spa_replay_record_cleanup,
+        NULL
+    );
 
-    pthread_attr_destroy( &__spa_replay_monitor_thread_attributes );
-    __spa_replay_monitor_is_init = ON;
+    // Failure if return code is not 0.
+    if ( 0 != rc )
+        return EXIT_FAILURE;
 
+    // Free resources and set that the thread was init'd.
+    pthread_attr_destroy( &spa_replay_monitor_thread_attributes );
+    spa_replay_monitor_is_init = ON;
+
+    // OK.
     return EXIT_SUCCESS;
 }
 
-// Record a SHA256 hash into the linked list.
-void create_replay_record( BYTE* hash, uint64_t* time ) {
-    pthread_mutex_lock( &__spa_replay_record_lock );
 
-    _spa_replay_record_push( hash, time );
-
-    pthread_mutex_unlock( &__spa_replay_record_lock );
-}
 
 // Check the hash against all valid records in the replays linked list.
-int check_for_replay( BYTE* hash ) {
-    pthread_mutex_lock( &__spa_replay_record_lock );
+int SPAReplay__check( char* hash ) {
+    pthread_mutex_lock( &spa_replay_record_lock );
 
     int exit_code = EXIT_SUCCESS;
-    LIST_NODE* current_node = list_get_head_node( replays_list );
-    if ( current_node == NULL )  goto __end_replay_records_check;
-    REPLAY_RECORD* current = ((REPLAY_RECORD*)(current_node->node));
+    list_node_t* p_node = hashes.p_head;
+    if ( NULL == p_node )
+        goto __end_replay_records_check;
+
+    spa_replay_record_t* p_current = &(p_node->record);
 
 # ifdef DEBUG
 __debuglog(
@@ -154,25 +221,25 @@ __debuglog(
 )
 # endif
 
-    if ( current != NULL ) {
+    if ( NULL != p_current ) {
         do {
 
 # ifdef DEBUG
 __debuglog(
     printf( " `------> Against hash with hex:\n" );
-    print_hex( &current->hash[0], SPA_PACKET_HASH_SIZE );
+    print_hex( &(p_current->hash[0]), SPA_PACKET_HASH_SIZE );
 )
 # endif
 
             for ( int i = 0; i < SPA_PACKET_HASH_SIZE; i++ ) {
-                if ( current->hash[i] != hash[i] )  goto __next_replay_record;
-                // didn't want to do a break here; TODO: too ambiguous?
+                if ( p_current->hash[i] != hash[i] )
+                    goto __next_replay_record;
             }
 
 # ifdef DEBUG
 __debuglog(
-    printf( "Found matching hash with timestamp '%lu'. Hexdump:\n", current->time );
-    print_hex( &current->hash[0], SPA_PACKET_HASH_SIZE );
+    printf( "Found matching hash with timestamp '%lu'. Hexdump:\n", p_current->time );
+    print_hex( &(p_current->hash[0]), SPA_PACKET_HASH_SIZE );
     print_hex( &hash[0], SPA_PACKET_HASH_SIZE );
 )
 # endif
@@ -182,10 +249,11 @@ __debuglog(
 
             __next_replay_record:
                 continue;
-        } while ( (current_node = current_node->next) != NULL );
+
+        } while ( NULL != (p_node = p_node->p_next) );
     }
 
     __end_replay_records_check:
-        pthread_mutex_unlock( &__spa_replay_record_lock );
+        pthread_mutex_unlock( &spa_replay_record_lock );
         return exit_code;
 }

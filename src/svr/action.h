@@ -18,7 +18,7 @@
 
 #define SPA_MAX_ACTIONS 1024
 #define SPA_MAX_OPTS_PER_ACTION 29
-#define SPA_SPA_MAX_ACTION_CMD_LEN 254
+#define SPA_MAX_ACTION_CMD_LEN 254
 #define SPA_MAX_ACTION_SUBSTITUTIONS 128
 
 
@@ -26,7 +26,7 @@
 // Actions are processed when the daemon starts and live in the heap.
 typedef struct spa_action_t {
     uint16_t action_id;
-    char command[SPA_SPA_MAX_ACTION_CMD_LEN];
+    char command[SPA_MAX_ACTION_CMD_LEN];
 } spa_action_t;
 
 // Simple character substitution structure for expanding action string directives/tokens.
@@ -44,7 +44,8 @@ struct spa_dynamic_substitutions_t {
 
 
 // Methods for accessing or manipulating loaded SPA actions.
-size_t SPAAction__count();
+void SPAAction__init();
+unsigned long SPAAction__count();
 void SPAAction__clear();
 spa_action_t* SPAAction__get( uint16_t action );
 spa_action_t* SPAAction__add( uint16_t action, const char* p_command );
