@@ -27,6 +27,7 @@
 
 
 
+// Initialize OpenSSL stuff.
 void openssl_init() {
     OpenSSL_add_all_algorithms();
     ERR_load_BIO_strings();
@@ -35,7 +36,8 @@ void openssl_init() {
 
 
 
-int sha256_digest( char* dest_buffer, const void* src_buffer, int buffer_len ) {
+// Calculate a SHA256 digest with OpenSSL.
+static inline int sha256_digest( unsigned char* dest_buffer, const void* src_buffer, int buffer_len ) {
     int retcode = EXIT_FAILURE;
 
     SHA256_CTX sha_ctx;
@@ -43,16 +45,17 @@ int sha256_digest( char* dest_buffer, const void* src_buffer, int buffer_len ) {
 
     if ( SHA256_Init( &sha_ctx ) != 1 )  return retcode;
     if ( SHA256_Update( &sha_ctx, src_buffer, buffer_len ) != 1 )  return retcode;
-    if ( SHA256_Final( (unsigned char*)dest_buffer, &sha_ctx ) != 1 )  return retcode;
+    if ( SHA256_Final( dest_buffer, &sha_ctx ) != 1 )  return retcode;
 
     return EXIT_SUCCESS;
 }
 
 
 
-int hash_packet( char* dst_buffer, spa_packet_t* p_packet ) {
-    char hashed_content[SPA_PACKET_HASHED_SECTION_LEN];
-    memcpy( &hashed_content[0], p_packet, SPA_PACKET_HASHED_SECTION_LEN );
+// Hash a SPA packet.
+int hash_packet( unsigned char* dst_buffer, spa_packet_t* p_packet ) {
+    unsigned char hashed_content[SPA_PACKET_HASHED_SECTION_LEN];
+    memcpy( hashed_content, p_packet, SPA_PACKET_HASHED_SECTION_LEN );
 
     if (  EXIT_FAILURE == sha256_digest( dst_buffer, hashed_content, SPA_PACKET_HASHED_SECTION_LEN )  )
         return -1;

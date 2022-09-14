@@ -79,6 +79,8 @@ unsigned long SPAUser__count() {
 
 // Clear the list of allocated users.
 void SPAUser__clear() {
+    if ( NULL == p_users_base )  return;
+
     for ( unsigned long x = 0; x < users_count; x++ )
         free(  (void*)(*((spa_user_t**)(p_users_base + (sizeof(spa_user_t*)*x))))  );
 
@@ -115,11 +117,17 @@ spa_user_t* SPAUser__get( char* p_username ) {
         return NULL;
     }
 
-    spa_user_t** p_user_base = (spa_user_t**)p_users_base;
-
+    __debuglog(  write_log( "***** Searching '%d' loaded users...\n", users_count );  )
     for ( unsigned long x = 0; x < users_count; x++ ) {
-        spa_user_t* p_x = *(p_user_base + x);
+        spa_user_t** pp_user = (spa_user_t**)(p_users_base + (sizeof(spa_user_t*)*x));
+        if ( NULL == pp_user )
+            continue;
 
+        spa_user_t* p_x = *pp_user;
+        if ( NULL == p_x )
+            continue;
+
+        __debuglog(  write_log( "******* Checking user '%s'.\n", p_x->username );  )
         if (  0 == strcmp( p_username, p_x->username )  ) {
             if ( ON != p_x->valid_user ) {
                 __debuglog(
@@ -136,6 +144,10 @@ spa_user_t* SPAUser__get( char* p_username ) {
         }
     }
 
+    // Represents exec that falls through the loop without finding a user by that name.
+    __debuglog(
+        write_log( "***** The user was not found in the users array.\n", NULL );
+    )
     return NULL;
 }
 
@@ -143,6 +155,8 @@ spa_user_t* SPAUser__get( char* p_username ) {
 
 // Add a user to the store of loaded profiles.
 spa_user_t* SPAUser__add( char* p_username ) {
+    __debuglog(  write_log( "*** Adding user with name '%s'.\n", p_username );  )
+
     // Check whether that username already exists.
     if (  NULL != SPAUser__get( p_username )  )
         return NULL;
@@ -170,7 +184,7 @@ spa_user_t* SPAUser__add( char* p_username ) {
     memcpy(  &(p_user->username[0]), p_username, strlen( p_username )  );
     p_user->username[SPA_PACKET_USERNAME_SIZE-1] = '\0';   //paranoia
 
-    *((spa_user_t**)(p_users_base + (sizeof(spa_user_t)*users_count))) = p_user;
+    *((spa_user_t**)(p_users_base + (sizeof(spa_user_t*)*users_count))) = p_user;
     users_count++;
 
     return p_user;
@@ -453,7 +467,7 @@ static int _load_user_pkey( spa_user_t* p_user_data, char* p_pem_filename, int i
         __debuglog(  printf( "***** Read x509; attempting to extract pubkey.\n" );  )
 
         if (  NULL == (pkey = X509_get_pubkey(cert))  ) {
-            BIO_printf( outbio, "ERROR getting public key from "
+            BIO_printf( outbio, "~~~ Problem getting public key from "
                 "x509 certificate '%s'.\n", p_pem_filename );
             goto end;
         }
@@ -470,7 +484,7 @@ static int _load_user_pkey( spa_user_t* p_user_data, char* p_pem_filename, int i
         BIO_free_all( pubkeybio );
 
         if ( NULL == pkey ) {
-            BIO_printf( outbio, "ERROR loading PEM x509 certificate or raw"
+            BIO_printf( outbio, "~~~ Problem loading PEM x509 certificate or raw"
                 " public key '%s' into memory.\n", p_pem_filename );
             goto end;
         }

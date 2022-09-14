@@ -92,11 +92,11 @@ int main( int argc, char **argv ) {
 
     // Ensure the 'system' command has a shall available. Otherwise, the entire application is pointless.
     if (  0 == system( NULL )  ) {
-        char p_username[32];
-        memset( &p_username[0], 0, 32 );
+        unsigned char p_username[32];
+        memset( p_username, 0, 32 );
 
-        getlogin_r( &p_username[0], 32 );
-        if (  0 != strnlen( p_username, 32 )  ) {
+        getlogin_r( (char*)p_username, 32 );
+        if (  0 != strnlen( (const char*)p_username, 32 )  ) {
             errx( 1, "No shell appears to be available for the executing "
                 "user '%s'. Terminating.\n", p_username );
         } else {
@@ -119,12 +119,12 @@ int main( int argc, char **argv ) {
     int cli_option_index = 0;
     int cli_opt;
 
-    char conf_file_c[PATH_MAX];
-    char* conf_file = &(conf_file_c[0]);
+    unsigned char conf_file_c[PATH_MAX];
+    unsigned char* conf_file = &(conf_file_c[0]);
     memset( conf_file_c, 0, PATH_MAX );
 
-    char pid_file_c[PATH_MAX];
-    char* pid_file = &(pid_file_c[0]);
+    unsigned char pid_file_c[PATH_MAX];
+    unsigned char* pid_file = &(pid_file_c[0]);
     memset( pid_file_c, 0, PATH_MAX );
 
 
@@ -146,13 +146,13 @@ int main( int argc, char **argv ) {
                 break;
             case 'p':
                 // The PID file will be disregarded if the application is not daemonized.
-                if (  NULL == (pid_file = (char*)strndup(optarg,PATH_MAX))  ) {
+                if (  NULL == (pid_file = (unsigned char*)strndup(optarg,PATH_MAX))  ) {
                     errx( 1, "strndup: failed to set pid-file override parameter.\n" );
                 }
-                memcpy( &spa_process.pidfile_path, pid_file, strnlen((const char*)pid_file,PATH_MAX) );
+                memcpy( spa_process.pidfile_path, pid_file, strnlen((const char*)pid_file,PATH_MAX) );
                 break;
             case 'c':
-                if (  NULL == (conf_file = (char*)strndup(optarg,PATH_MAX))  ) {
+                if (  NULL == (conf_file = (unsigned char*)strndup(optarg,PATH_MAX))  ) {
                     errx( 1, "strndup: failed to set config-file override parameter.\n" );
                 }
                 break;
@@ -162,15 +162,15 @@ int main( int argc, char **argv ) {
 
     // Load the service configuration.
     if (  strnlen( (const char*)conf_file, PATH_MAX ) <= 0  ) {
-        conf_file = p_default_conf;
+        conf_file = (unsigned char*)p_default_conf;
     }
 
     // Start logging here based on target log-level.
     //   The program assumes DEBUG logging until the log_level conf is loaded.
-    SPAConf__parse( conf_file );
+    SPAConf__parse( (const char*)conf_file );
     memcpy(  &(spa_process.config_path[0]), conf_file, strnlen((const char*)conf_file,PATH_MAX)  );
 
-    if ( conf_file != p_default_conf )
+    if ( conf_file != (unsigned char*)p_default_conf )
         free( conf_file );
     conf_file = NULL;
 
@@ -208,8 +208,8 @@ int main( int argc, char **argv ) {
 
     size_t nbytes;
 
-    char recv_buffer[PACKET_BUFFER_SIZE];
-    char send_buffer[PACKET_BUFFER_SIZE];
+    unsigned char recv_buffer[PACKET_BUFFER_SIZE];
+    unsigned char send_buffer[PACKET_BUFFER_SIZE];
 
     struct sockaddr_in6 clientaddr;
 
@@ -356,7 +356,7 @@ void* handle_packet( void* p_packet_meta ) {
         uint64_t packet_id = ((spa_packet_meta_t*)p_packet_meta)->packet_id;
 
         char client_addr[INET6_ADDRSTRLEN];
-        memset( &(client_addr[0]), 0, INET6_ADDRSTRLEN );
+        memset( client_addr, 0, INET6_ADDRSTRLEN );
 
         inet_ntop( AF_INET6, &(clientaddr->sin6_addr), client_addr, INET6_ADDRSTRLEN );
 
@@ -367,24 +367,24 @@ void* handle_packet( void* p_packet_meta ) {
 
 
         // Get string-like fields and forcibly null-terminate them.
-        char username[SPA_PACKET_USERNAME_SIZE+1];
+        unsigned char username[SPA_PACKET_USERNAME_SIZE+1];
         memset( username, 0, SPA_PACKET_USERNAME_SIZE+1 );
 
         memcpy( username, &(p_packet->username), SPA_PACKET_USERNAME_SIZE );
         username[SPA_PACKET_USERNAME_SIZE] = '\0';
 
         // This is not necessary to null-term; it's not a string.
-        char signature[SPA_PACKET_HASH_SIZE];
+        unsigned char signature[SPA_PACKET_HASH_SIZE];
         memset( signature, 0, SPA_PACKET_HASH_SIZE );
-        memcpy( signature, &p_packet->packet_hash, SPA_PACKET_HASH_SIZE );
+        memcpy( signature, p_packet->packet_hash, SPA_PACKET_HASH_SIZE );
 
 
         __verboselog(
-            char sigtohex[(SPA_PACKET_HASH_SIZE*2) + 1];
+            unsigned char sigtohex[(SPA_PACKET_HASH_SIZE*2) + 1];
             memset( sigtohex, 0, (SPA_PACKET_HASH_SIZE*2)+1 );
 
             for ( int i = 0; i < SPA_PACKET_HASH_SIZE; i++ )
-                snprintf( &(sigtohex[i*2]), 3, "%02x", (unsigned int)(p_packet->packet_hash[i]) );
+                snprintf( (char*)&(sigtohex[i*2]), 3, "%02x", (unsigned int)(p_packet->packet_hash[i]) );
             sigtohex[SPA_PACKET_HASH_SIZE*2] = '\0';
 
             packet_log( packet_id, "+++ Username: %s\n", username );
@@ -685,7 +685,7 @@ int send_response(
         packet_log( packet_id, "Sending response datagram "
             "with payload hexdump:\n", NULL );
         )
-        print_hex( (char*)p_resp_packet, sizeof(spa_response_packet_t) );
+        print_hex( (unsigned char*)p_resp_packet, sizeof(spa_response_packet_t) );
 # endif
 
     int sentbytes = -1;
@@ -698,7 +698,7 @@ int send_response(
 
 # ifdef DEBUG
         __debuglog(  printf( "=== Dumping sendto sockaddr_in:\n" );  )
-        print_hex( (char*)p_ip4, sizeof(struct sockaddr_in) );
+        print_hex( (unsigned char*)p_ip4, sizeof(struct sockaddr_in) );
 # endif
 
         sentbytes = sendto( mainsockfd, (char*)p_resp_packet, sizeof(spa_response_packet_t),
@@ -708,7 +708,7 @@ int send_response(
 
 # ifdef DEBUG
     __debuglog(  printf( "=== Dumping sendto sockaddr_in6:\n" );  )
-    print_hex( (char*)p_clientaddr, sizeof(struct sockaddr_in6) );
+    print_hex( (unsigned char*)p_clientaddr, sizeof(struct sockaddr_in6) );
 # endif
 
         sentbytes = sendto( mainsockfd, (char*)p_resp_packet, sizeof(spa_response_packet_t),
@@ -967,7 +967,6 @@ void register_signals() {
     sa.sa_handler = handle_signal;
     sigaction( SIGINT,  &sa, NULL );
     sigaction( SIGTERM, &sa, NULL );
-    sigaction( SIGKILL, &sa, NULL );
     sigaction( SIGHUP,  &sa, NULL );
 }
 
@@ -980,8 +979,8 @@ void handle_signal( int signal ) {
             write_log( "Reading process meta-info for configuration path.\n", NULL );
         )
 
-        char conf_path_c[PATH_MAX];
-        char* conf_path = &conf_path_c[0];
+        unsigned char conf_path_c[PATH_MAX];
+        unsigned char* conf_path = &conf_path_c[0];
         memset( conf_path, 0, PATH_MAX );
 
         memcpy( conf_path, &(spa_process.config_path),
@@ -989,7 +988,7 @@ void handle_signal( int signal ) {
         __debuglog(  write_log( "Got conf path: |%s|\n", conf_path );  )
 
         SPAConf__clear();
-        SPAConf__parse( conf_path );
+        SPAConf__parse( (const char*)conf_path );
 
         spawn_socket();   //rebind according to new conf params
 

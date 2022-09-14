@@ -58,15 +58,16 @@ static int is_bool_option_yes( char* value ) {
     if ( strnlen(value,3) < 3 )
         return EXIT_FAILURE;
 
-    char* lowerval = (char*)calloc( 1, 4 );
+    char lowerval[4] = {0};
+    memset( &lowerval[0], 0, 4 );
+
     memcpy( lowerval, value, 3 );
-    lowerval[3] = '\0';
+    lowerval[3] = '\0';   // le paranoia
 
     strtolower( lowerval );
 
-    int is_yes = ( strcmp( lowerval, "yes" ) == 0 ) ? EXIT_SUCCESS : EXIT_FAILURE;
+    int is_yes = ( 0 == strcmp( lowerval, "yes" ) ) ? EXIT_SUCCESS : EXIT_FAILURE;
 
-    free( lowerval );
     return is_yes;
 }
 ///////////////////////////////////////////////////////////
@@ -94,7 +95,9 @@ int SPAConf__set_flag( int on_or_off, uint16_t flag ) {
         spa_conf.flags &= ~flag;   //off
     }
 
-    __debuglog( write_log( "******* Config flags: |0x%04x|\n", spa_conf.flags ); )
+    __debuglog(
+        write_log( "******* Config flags: |0x%04x|\n", spa_conf.flags );
+    )
     return EXIT_SUCCESS;
 }
 
@@ -204,7 +207,8 @@ int SPAConf__parse( const char* p_conf_path ) {
                 write_error_log( "Config line #%d: The mode cannot be defined multiple times.\n", line_num );
             }
 
-            char* lowerval = (char*)calloc( 1, 16 );   //allocate what's basically the maxlen of any mode
+            char lowerval[16] = {0}; // 16 is the max length of any mode
+            memset( &lowerval[0], 0, 16 );
             memcpy( lowerval, val, strnlen(val,16) );
             lowerval[15] = '\0';
             strtolower( lowerval );
@@ -218,12 +222,10 @@ int SPAConf__parse( const char* p_conf_path ) {
             else if (  0 == strcmp( lowerval, "noisy" )  )
                 spa_conf.mode = noisy;
             else {
-                free( lowerval );
                 write_error_log( "Config line #%d: Invalid operating mode '%s'\n", line_num, lowerval );
             }
 
             __debuglog(  write_log( "+++++ Mode set to: |%d|\n", spa_conf.mode );  )
-            free( lowerval );
         }
 
         // Parse the log_level of the application.
@@ -329,14 +331,9 @@ int SPAConf__parse( const char* p_conf_path ) {
                     " %d characters. Consider simplifying your handler.\n", line_num, SPA_MAX_ACTION_CMD_LEN-1 );
             }
 
-            // Checks done. Load the action information into the meta config.
-            spa_action_t* p_action = (spa_action_t*)calloc( 1, sizeof(spa_action_t) );
-
-            p_action->action_id = (uint16_t)(ON & 0xFFFF);
-            memcpy( &(p_action->command[0]), val, strlen(val)+1 );
-            memcpy( &(spa_conf.generic_action), p_action, sizeof(spa_action_t) );
-
-            free( p_action );
+            // Checks done. Load the action information into the meta config for the generic action.
+            spa_conf.generic_action.action_id = (uint16_t)(ON & 0xFFFF);
+            memcpy(  &((spa_conf.generic_action).command[0]), val, (strlen(val)+1)  );
 
             // Set the config flag to indicate a generic action is being used.
             SPAConf__set_flag( ON, SPA_CONF_FLAG_GENERIC_ACTION );
@@ -397,22 +394,20 @@ int SPAConf__parse( const char* p_conf_path ) {
 
             spa_user_t* p_user = SPAUser__get( keyright );
             if ( NULL == p_user ) {
-                write_error_log( "Config line #%d: policy user could not be loaded. "
-                    "Is this user defined?", line_num );
+                write_error_log( "Config line #%d: policy user '%s' could not be loaded. "
+                    "Is this user defined?", line_num, keyright );
             }
 
             __debuglog(
                 write_log( "+++ Loading authorizations for '%s'.\n", p_user->username );
             )
             if (  EXIT_SUCCESS != SPAUser__load_autls( p_user, val )  ) {
-                free( p_user );
                 write_error_log( "Config line #%d: could not load autls for user.\n", line_num );
             }
 
             __debuglog(
                 write_log( "+++++ User has total of %d authorization lists.\n", p_user->autl_count );
             )
-            free( p_user );
         }
 
         // Parse pubkeys (requires 'users' to have been defined)
@@ -459,7 +454,6 @@ int SPAConf__parse( const char* p_conf_path ) {
             __debuglog(
                 write_log( "+++++ Loaded pubkey for user '%s'.\n", p_user->username );
             )
-            free( p_user );
         }
 
         // Parse actions (requires the generic_action flag to have NOT been set; won't crash, just warn if it is)

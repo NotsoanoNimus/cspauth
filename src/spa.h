@@ -96,22 +96,22 @@ typedef struct _spa_response_packet_t {
     uint16_t reserved;
     uint64_t timestamp;
     uint64_t packet_id;
-    char response_data[SPA_RESPONSE_STRLEN];
+    unsigned char response_data[SPA_RESPONSE_STRLEN];
 } spa_response_packet_t;
 
 
 
 // The structure of an incoming Single Packet Authorization datagram.
 typedef struct _spa_packet_t {
-    char packet_data[SPA_PACKET_DATA_SIZE];
-    char username[SPA_PACKET_USERNAME_SIZE];
+    unsigned char packet_data[SPA_PACKET_DATA_SIZE];
+    unsigned char username[SPA_PACKET_USERNAME_SIZE];
     uint64_t client_timestamp;
     uint16_t request_action;
     uint16_t request_option;
     uint32_t __reserved;   //trying to keep nice boundaries
-    char packet_hash[SPA_PACKET_HASH_SIZE];
+    unsigned char packet_hash[SPA_PACKET_HASH_SIZE];
     uint32_t signature_length;
-    char packet_signature[SPA_PACKET_MAX_SIGNATURE_SIZE];
+    unsigned char packet_signature[SPA_PACKET_MAX_SIGNATURE_SIZE];
 } spa_packet_t;
 
 // Wrapper struct for meta-data about an incoming SPA packet.

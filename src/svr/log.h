@@ -82,7 +82,7 @@ void SPALog__write(
 
 # ifdef DEBUG
 // Used to print raw information about a packet or other data in memory.
-void print_hex( char* data, unsigned long len );
+void print_hex( unsigned char* data, unsigned long len );
 # endif
 
 

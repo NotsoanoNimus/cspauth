@@ -29,7 +29,7 @@
 
 // Holds a packet hash and a timestamp.
 typedef struct _spa_replay_record_t {
-    char hash[SPA_PACKET_HASH_SIZE];
+    unsigned char hash[SPA_PACKET_HASH_SIZE];
     uint64_t time;
 } spa_replay_record_t;
 
@@ -188,7 +188,7 @@ int SPAReplay__init() {
 
 
 // Add a replay record to the linked list (wrapper function.
-void SPAReplay__add( char* hash, uint64_t time ) {
+void SPAReplay__add( unsigned char* hash, uint64_t time ) {
     pthread_mutex_lock( &spa_replay_record_lock );
 
     list_node_t* p_new = (list_node_t*)calloc( 1, sizeof(list_node_t) );
@@ -207,7 +207,7 @@ void SPAReplay__add( char* hash, uint64_t time ) {
 
 
 // Check the hash against all valid records in the replays linked list.
-int SPAReplay__check( char* hash ) {
+int SPAReplay__check( unsigned char* hash ) {
     pthread_mutex_lock( &spa_replay_record_lock );
 
     int exit_code = EXIT_SUCCESS;
@@ -220,7 +220,7 @@ int SPAReplay__check( char* hash ) {
 # ifdef DEBUG
 __debuglog(
     printf( " `---> Checking SPA packet CURRENT hash for replay with hex:\n" );
-    print_hex( &hash[0], SPA_PACKET_HASH_SIZE );
+    print_hex( hash, SPA_PACKET_HASH_SIZE );
 )
 # endif
 
@@ -230,7 +230,7 @@ __debuglog(
 # ifdef DEBUG
 __debuglog(
     printf( " `------> Against hash with hex:\n" );
-    print_hex( &(p_current->hash[0]), SPA_PACKET_HASH_SIZE );
+    print_hex( (unsigned char*)(p_current->hash), SPA_PACKET_HASH_SIZE );
 )
 # endif
 
@@ -242,8 +242,8 @@ __debuglog(
 # ifdef DEBUG
 __debuglog(
     printf( "Found matching hash with timestamp '%lu'. Hexdump:\n", p_current->time );
-    print_hex( &(p_current->hash[0]), SPA_PACKET_HASH_SIZE );
-    print_hex( &hash[0], SPA_PACKET_HASH_SIZE );
+    print_hex( (unsigned char*)(p_current->hash), SPA_PACKET_HASH_SIZE );
+    print_hex( hash, SPA_PACKET_HASH_SIZE );
 )
 # endif
 

@@ -31,7 +31,7 @@
 
 
 // Packet pre-filtering. Anything rejected at this stage will NEVER emit a response packet, regardless of mode.
-int pre_packet_verify( char* p_input_buffer ) {
+int pre_packet_verify( unsigned char* p_input_buffer ) {
     int exit_code = EXIT_FAILURE;
     __debuglog(  printf( "*** Packet pre-checks.\n" );  )
 
@@ -54,7 +54,7 @@ int pre_packet_verify( char* p_input_buffer ) {
         goto __err;
     }
 
-    if (  strnlen( p_packet->username, 3 ) <= 0  ) {
+    if (  strnlen( (const char*)(p_packet->username), 3 ) <= 0  ) {
         __debuglog(  printf( "***** Packet doesn't have a username.\n" );  )
         goto __err;
     }
@@ -103,7 +103,7 @@ int verify_timestamp( uint64_t packet_id, uint64_t timestamp ) {
 
 
 // Verifies that the username is valid and loaded. Really just a wrapper function.
-int verify_username( uint64_t packet_id, char* p_username ) {
+int verify_username( uint64_t packet_id, unsigned char* p_username ) {
     __verboselog(
         packet_log( packet_id, "+++ Attempting to get user configuration for '%s'.\n", p_username );
     )
@@ -145,7 +145,7 @@ int verify_packet_hash( uint64_t packet_id, spa_packet_t* p_spa_packet ) {
         packet_log( packet_id, "+++ Generating sha256 packet hash...\n", NULL );
     )
 
-    char digest[SHA256_DIGEST_LENGTH];
+    unsigned char digest[SHA256_DIGEST_LENGTH];
     if (  (hash_packet( digest, p_spa_packet )) < 1  ) {
         __verboselog(
             packet_log( packet_id, "~~~~~ Failed to generate a hash for the packet.\n", NULL );
@@ -331,11 +331,11 @@ int verify_signature(
         goto __err;
 
     __debuglog(  printf( "***** Updating message digest context.\n" );  )
-    if (  1 != EVP_DigestVerifyUpdate( mdctx, &(p_spa_packet->packet_hash[0]), SHA256_DIGEST_LENGTH )  )
+    if (  1 != EVP_DigestVerifyUpdate( mdctx, p_spa_packet->packet_hash, SHA256_DIGEST_LENGTH )  )
         goto __err;
 
     __debuglog(  printf( "***** Verifying signature...\n" );  )
-    rc = EVP_DigestVerifyFinal( mdctx, (unsigned char*)&(p_spa_packet->packet_signature[0]), siglen );
+    rc = EVP_DigestVerifyFinal( mdctx, p_spa_packet->packet_signature, siglen );
 
 
     __err:

@@ -27,7 +27,7 @@ server: $(SVRBIN)
 client: $(CLIBIN)
 
 
-release: CFLAGS=-pthread -Wall -lcrypto -lssl -O2 -DNDEBUG
+release: CFLAGS=-pthread -Wall -lcrypto -lssl -O3 -DNDEBUG
 release: clean
 release: $(SVRBIN) $(CLIBIN)
 

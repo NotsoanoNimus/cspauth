@@ -44,6 +44,8 @@ unsigned long SPAAction__count() {
 
 // Deeply clear the heap array.
 void SPAAction__clear() {
+    if ( NULL == p_actions_base )  return;
+
     for ( unsigned long x = 0; x < actions_count; x++ )
         free( (void*)(*((spa_action_t**)(p_actions_base + (sizeof(spa_action_t*)*x)))) );
 
@@ -107,7 +109,7 @@ static inline char* spa_action_get_token_value(
     spa_packet_meta_t* p_packet_meta,
     sa_family_t* listen_family
 );
-static inline int substitute_packet_data( char* p_action_str );
+static inline int substitute_packet_data( unsigned char* p_action_str );
 
 int SPAAction__perform(
     spa_action_t* p_action,
@@ -375,11 +377,11 @@ static inline char* spa_action_get_token_value(
 
 
 
-static inline int substitute_packet_data( char* p_action_str ) {
+static inline int substitute_packet_data( unsigned char* p_action_str ) {
 # ifdef DEBUG
 __debuglog(
     printf( "Packet Data hexdump BEFORE:\n" );
-    print_hex( p_action_str, SPA_PACKET_DATA_SIZE );
+    print_hex( (unsigned char*)p_action_str, SPA_PACKET_DATA_SIZE );
 )
 # endif
 
@@ -397,7 +399,7 @@ __debuglog(
 # ifdef DEBUG
 __debuglog(
     printf( "Packet Data hexdump AFTER:\n" );
-    print_hex( p_action_str, SPA_PACKET_DATA_SIZE );
+    print_hex( (unsigned char*)p_action_str, SPA_PACKET_DATA_SIZE );
 )
 # endif
 
