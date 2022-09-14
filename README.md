@@ -49,31 +49,39 @@ Firstly, it's crucial to understand some quick terms in this document in order t
 The server configuration, as verbose and long-winded as it looks, really boils down to __four__
 critically-important values for getting SPAs through:
 
-- `users` - A command-separated list (which can be specified multiple times) that denotes "user"
+- `users` - A comma-separated list (which can be specified multiple times) that denotes "user"
   objects who will have their own unique cryptographic keys and function authorizations.
 - `pubkey:[user]` - Associates the full-path of the public key file to the username.
-- `autl:[user]` - Associates the authorization list to the username.
+- `autl:[user]` - Associates the authorization list to the username. These can be specified
+  multiple times in an additive fashion, to make human-parsing AUTLs easier to do.
 - `action:[ID]` - Defines a command to pass to the underlying system shell for the given ID. The
-  ID portion is the ID that's referenced in a client's "function" SPA request.
+  ID portion is the action ID that's referenced in a requested Function.
 
-The simple breakdown for what happens when a SPA packet is received by the server is:
+When a packet is received by the server, it follows the following procedure, failing at any point
+if something does not look valid or correct about the incoming packet along the way:
 1. Check the timestamp against the server time, according to the `validity_window` setting.
 2. Check the username and fetch her details.
 3. Verify the packet hash is expected, and isn't a replay (if monitoring is enabled).
-4. Validate the requested function against the user's authorization list.
+4. Validate the requested function exists and is actively loaded.
 5. Get the user's public key and verify the packet signature.
-6. Grant authorization and perform the requested function.
+6. Check the user's authorization lists to perform the requested Function.
+7. Record the packet hash in the replay monitor, if enabled.
+8. Grant authorization and perform the requested function.
+9. If set, send a response packet back to the issuing client.
 
-With this in mind, setting up x509 certificates for use with the service and then delegating
+With this in mind, setting up _x509 certificates_ for use with the service and then delegating
 authorized functions to certain users, who hold their respective key files, shouldn't seem much
 of a hassle.
 
-Once the user has a compatible client and their key, and they know their permitted functions,
-they should be set to call them on the SPA server whenever they like. The configuration does
-include a few possibly useful example actions that server administrators may be interested in.
+Similarly, certificates aren't necessary if public/private pairs are desired instead for one or
+more "registered" users.
+
+Once the user has a compatible client and their key, and they know their permitted Functions,
+they should be able to call them on the SPA server whenever they like. The configuration does
+include a few possibly-useful example actions that server administrators may be interested in.
 
 
-#### Why Use IDs or Indexes?
+### Why Use IDs or Indexes?
 
 As a side-note, some might ask, _"Why would you use ID numbers for calling these actions,
 rather than allowing remote commands to be passed?"_
@@ -81,6 +89,8 @@ rather than allowing remote commands to be passed?"_
 The response would be that a server administrator defining rigid "instructions" which are
 directly granted to selected users, is so much simpler to manage, secure, and authorize
 than directly allowing arbitrary commands to be passed to the underlying system shell.
+
+Again, this is in the "Crude" part of the name since the software itself is bare and minimal.
 
 ---
 
@@ -100,8 +110,8 @@ packet formatting and order:
 | packet_data | 0 | 32 | Intended to be junk/random data, but could be used in `[[UNSAFE_DATA]]` action token expansions. |
 | username | 32 | 16 | String representing the request's username, which associates to a local public key. |
 | client_timestamp | 48 | QWORD | Epoch timestamp according to the client application/workstation. |
-| request_action | 56 | WORD | The 16-bit Action portion of the requested function. |
-| request_option | 58 | WORD | The 16-bit Option portion of the requested function. |
+| request_action | 56 | WORD | The 16-bit Action portion of the requested Function. |
+| request_option | 58 | WORD | The 16-bit Option portion of the requested Function. |
 | __reserved | 60 | DWORD | Reserved space. Used to round packet fields to clean 2^x boundaries. |
 | packet_hash | 64 | 32 | SHA256 packet digest of all the above fields. This digest is then signed (by another crypto digest function). |
 | signature_length | 96 | DWORD | The length of this SPA packet's trailing cryptographic signature. |
@@ -205,6 +215,15 @@ To build the client and server applications independently:
 ```
 make clean ; make client/server
 ```
+
+---
+
+## TODOs & Future Goals
+- [ ] Implement a per-user locking mechanism that disallows commands from being executed multiple
+  times simultaneously. This could be _optional_ or on a per-Action basis somehow.
+- [ ] Improve shell command execution and expandable tokens.
+- [ ] Write tests which can be run using a bastardized version of the client at compile-time.
+
 
 ---
 
