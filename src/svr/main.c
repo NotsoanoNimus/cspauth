@@ -370,7 +370,7 @@ void* handle_packet( void* p_packet_meta ) {
         unsigned char username[SPA_PACKET_USERNAME_SIZE+1];
         memset( username, 0, SPA_PACKET_USERNAME_SIZE+1 );
 
-        memcpy( username, &(p_packet->username), SPA_PACKET_USERNAME_SIZE );
+        memcpy( username, p_packet->username, SPA_PACKET_USERNAME_SIZE );
         username[SPA_PACKET_USERNAME_SIZE] = '\0';
 
         // This is not necessary to null-term; it's not a string.
@@ -384,7 +384,7 @@ void* handle_packet( void* p_packet_meta ) {
             memset( sigtohex, 0, (SPA_PACKET_HASH_SIZE*2)+1 );
 
             for ( int i = 0; i < SPA_PACKET_HASH_SIZE; i++ )
-                snprintf( (char*)&(sigtohex[i*2]), 3, "%02x", (unsigned int)(p_packet->packet_hash[i]) );
+                snprintf( (char*)&(sigtohex[i*2]), 3, "%02x", (unsigned char)(p_packet->packet_hash[i]) );
             sigtohex[SPA_PACKET_HASH_SIZE*2] = '\0';
 
             packet_log( packet_id, "+++ Username: %s\n", username );
@@ -393,7 +393,7 @@ void* handle_packet( void* p_packet_meta ) {
                 p_packet->request_action, p_packet->request_option );
             packet_log( packet_id, "+++ Hash (sha256): %s\n", sigtohex );
 #ifdef DEBUG
-            fprintf( stderr, "Hexdumping packet signature:\n" );
+            fprintf( stderr, "Hexdumping packet hash:\n" );
             __debuglog(  print_hex( p_packet->packet_hash, SPA_PACKET_HASH_SIZE );  )
 #endif
         )

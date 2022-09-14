@@ -346,9 +346,9 @@ int SPAUser__dump_autls( spa_user_t* p_user_data, FILE* stream ) {
     printf( "= DUMPING AUTL FOR USER '%s'.\n", p_user_data->username );
     printf( "= Count of list is %d entries.\n", p_user_data->autl_count );
 
-    spa_autl_t* p_autl = (spa_autl_t*)(p_user_data->p_autls);
-
     for ( unsigned long x = 0; x < p_user_data->autl_count; x++ ) {
+        spa_autl_t* p_autl = (spa_autl_t*)(p_user_data->p_autls + (sizeof(spa_autl_t)*x));
+
         if ( NULL == p_autl )  break;
         printf( "=== Action ID #%d:\n", p_autl->action_id );
 
@@ -375,20 +375,30 @@ int SPAUser__dump_autls( spa_user_t* p_user_data, FILE* stream ) {
 
 // Check a user's autl policies against a list and return whether they're authorized for the action/option.
 int SPAUser__is_authorized( spa_user_t* p_user_data, uint16_t action, uint16_t option ) {
+    if ( NULL == p_user_data )
+        return EXIT_FAILURE;
+
+    __debuglog(
+        write_log( "*** Checking user '%s' access to action '%d' with option '%d'.\n",
+            p_user_data->username, action, option );
+    )
+
     // Users are alwaus authorized to perform an action when the generic action handler is used.
     //   Reminder, this still requires the user to _authenticate_ themselves in the packet signature/timestamp.
     if (  EXIT_SUCCESS == SPAConf__get_flag( SPA_CONF_FLAG_GENERIC_ACTION )  ) {
         return EXIT_SUCCESS;
     }
 
-    if ( NULL == p_user_data || NULL == p_user_data->p_autls )
+    if ( NULL == p_user_data->p_autls )
         return EXIT_FAILURE;
     else if (  p_user_data->autl_count < 1  )
         return EXIT_FAILURE;
 
-    spa_autl_t* p_autl = (spa_autl_t*)(p_user_data->p_autls);
-
     for ( unsigned long x = 0; x < p_user_data->autl_count; x++ ) {
+        spa_autl_t* p_autl = (spa_autl_t*)(p_user_data->p_autls + (sizeof(spa_autl_t)*x));
+        if ( NULL == p_autl )
+            continue;
+
         // If this autl doesn't permit "*" (any) and the action ID isn't a match, move on.
         if ( ON != p_autl->any_action && action != p_autl->action_id )
             continue;

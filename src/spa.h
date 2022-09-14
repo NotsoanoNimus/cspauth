@@ -39,8 +39,10 @@
 
 // Size from the start of a packet that gets hashed.
 #define SPA_PACKET_HASHED_SECTION_LEN ( \
-    sizeof(spa_packet_t) - sizeof(uint32_t) \
-    - SPA_PACKET_MAX_SIGNATURE_SIZE - SPA_PACKET_HASH_SIZE \
+    SPA_PACKET_DATA_SIZE + SPA_PACKET_USERNAME_SIZE \
+    + sizeof(uint64_t) \
+    + (sizeof(uint16_t)*2) \
+    + sizeof(uint32_t) \
 )
 
 // Get a max and min on packet length.
