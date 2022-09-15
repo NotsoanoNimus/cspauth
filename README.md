@@ -1,6 +1,6 @@
 # CSPAuth[D] - Crude Single Packet Authorization [Daemon]
 
->>>[GO HERE](https://xmit.xyz/software/cspauthd/)<<<
+\>\>\> [GO HERE](https://xmit.xyz/software/cspauthd/) \<\<\<
 to read usage and protocol information about this application.
 
 ---
